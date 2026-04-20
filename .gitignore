@@ -1,0 +1,37 @@
+# Python
+*.pyc
+__pycache__/
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Generated artifacts
+*.hwpx
+*.style_cache/
+.style_cache/
+.tmp/
+*.log
+
+# Config (may contain API keys)
+config.json
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Real project inputs (exclude to protect client data)
+_context/*.hwp
+_context/*.hwpx
+_context/*.pdf
+_context/*.docx
+_context/*.md
+_context/*.tmp
+.style_cache/
+.tmp_inspect/
