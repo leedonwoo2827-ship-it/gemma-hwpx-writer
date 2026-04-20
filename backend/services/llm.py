@@ -90,7 +90,8 @@ class GeminiProvider(LLMProvider):
         self.vision_model = vision_model
 
     def _endpoint(self, model: str) -> str:
-        return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={self.api_key}"
+        # ?alt=sse 로 SSE 포맷 (data: {...}) 사용 — JSON 배열 파싱 이슈 회피
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={self.api_key}"
 
     def _endpoint_sync(self, model: str) -> str:
         return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
@@ -100,19 +101,41 @@ class GeminiProvider(LLMProvider):
         body: dict = {"contents": [{"role": "user", "parts": parts}]}
         if system:
             body["systemInstruction"] = {"parts": [{"text": system}]}
+        yielded_any = False
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", self._endpoint(self.text_model), json=body) as r:
-                async for line in r.aiter_lines():
-                    if not line or not line.strip().startswith("{"):
+                if r.status_code != 200:
+                    err_text = (await r.aread()).decode("utf-8", errors="ignore")
+                    raise RuntimeError(f"Gemini {r.status_code}: {err_text[:500]}")
+                async for raw in r.aiter_lines():
+                    if not raw:
                         continue
+                    if not raw.startswith("data:"):
+                        continue
+                    data = raw[5:].strip()
+                    if data == "[DONE]":
+                        break
                     try:
-                        chunk = json.loads(line.rstrip(","))
+                        chunk = json.loads(data)
                     except Exception:
                         continue
                     for cand in chunk.get("candidates", []):
                         for p in cand.get("content", {}).get("parts", []):
-                            if "text" in p:
-                                yield p["text"]
+                            t = p.get("text")
+                            if t:
+                                yielded_any = True
+                                yield t
+        if not yielded_any:
+            # 스트리밍 실패 폴백: 단회 호출로 재시도
+            async with httpx.AsyncClient(timeout=300) as client:
+                r = await client.post(self._endpoint_sync(self.text_model), json=body)
+                r.raise_for_status()
+                data = r.json()
+                for cand in data.get("candidates", []):
+                    for p in cand.get("content", {}).get("parts", []):
+                        t = p.get("text")
+                        if t:
+                            yield t
 
     async def generate_vision(self, image_paths: Iterable[str], prompt: str, system: Optional[str] = None) -> str:
         parts: list[dict] = [{"text": prompt}]
