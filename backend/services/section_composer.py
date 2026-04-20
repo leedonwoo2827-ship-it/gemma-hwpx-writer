@@ -6,7 +6,7 @@ from .llm import get_provider
 
 
 SECTION_SYSTEM = """당신은 KOICA/ODA 결과보고서 작성 전문가입니다.
-주어진 3개 원문(계획서, Work Plan, Wrap Up)에서 특정 섹션의 본문만 한국어로 작성합니다.
+주어진 여러 원문에서 특정 섹션의 본문만 한국어로 작성합니다.
 
 규칙:
 1. 공공문서 톤 (객관적, 경어)
@@ -24,35 +24,25 @@ def _trim(text: str, max_chars: int = 15000) -> str:
     return text[:half] + "\n... [중략] ...\n" + text[-half:]
 
 
-def build_prompt(section_title: str, plan_md: str, workplan_md: str, wrapup_md: str) -> str:
+def build_prompt(section_title: str, sources: list[tuple[str, str]]) -> str:
+    parts = [f"<{name}>\n{_trim(content)}\n</{name}>" for name, content in sources]
+    body = "\n\n".join(parts)
     return f"""다음은 섹션 "{section_title}" 의 본문만 작성하는 작업입니다.
 
-아래 3개 원문을 근거로 해당 섹션에 들어갈 내용을 작성하세요.
+아래 {len(sources)}개 원문을 근거로 해당 섹션에 들어갈 내용을 작성하세요.
 
-<계획서>
-{_trim(plan_md)}
-</계획서>
-
-<Work Plan>
-{_trim(workplan_md)}
-</Work Plan>
-
-<Wrap Up>
-{_trim(wrapup_md)}
-</Wrap Up>
+{body}
 
 섹션 "{section_title}" 본문(제목 제외, 불릿 기호 ○/- 허용):"""
 
 
 async def compose_section(
     section_title: str,
-    plan_md: str,
-    workplan_md: str,
-    wrapup_md: str,
+    sources: list[tuple[str, str]],
 ) -> str:
     provider = get_provider()
     out_parts: list[str] = []
-    prompt = build_prompt(section_title, plan_md, workplan_md, wrapup_md)
+    prompt = build_prompt(section_title, sources)
     async for chunk in provider.generate_text(prompt, system=SECTION_SYSTEM):
         out_parts.append(chunk)
     return "".join(out_parts).strip()
@@ -60,11 +50,8 @@ async def compose_section(
 
 async def compose_sections_stream(
     section_titles: list[str],
-    plan_md: str,
-    workplan_md: str,
-    wrapup_md: str,
+    sources: list[tuple[str, str]],
 ) -> AsyncIterator[tuple[str, str]]:
-    """각 섹션별로 순차 생성하며 (section_title, body_text) 튜플을 yield."""
     for title in section_titles:
-        body = await compose_section(title, plan_md, workplan_md, wrapup_md)
+        body = await compose_section(title, sources)
         yield title, body

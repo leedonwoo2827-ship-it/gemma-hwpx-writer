@@ -27,13 +27,10 @@ def _truncate(text: str, budget: int) -> str:
     return text[:half] + "\n\n... [중략] ...\n\n" + text[-half:]
 
 
-async def compose_report(plan_md: str, workplan_md: str, wrapup_md: str) -> AsyncIterator[str]:
-    per = MAX_CONTEXT_CHARS // 3
-    prompt = composer_user_prompt(
-        _truncate(plan_md, per),
-        _truncate(workplan_md, per),
-        _truncate(wrapup_md, per),
-    )
+async def compose_report(sources: list[tuple[str, str]]) -> AsyncIterator[str]:
+    per = MAX_CONTEXT_CHARS // max(1, len(sources))
+    trimmed = [(n, _truncate(c, per)) for n, c in sources]
+    prompt = composer_user_prompt(trimmed)
     provider = get_provider()
     async for chunk in provider.generate_text(prompt, system=COMPOSER_SYSTEM):
         yield chunk
@@ -41,17 +38,11 @@ async def compose_report(plan_md: str, workplan_md: str, wrapup_md: str) -> Asyn
 
 async def compose_with_template_headings(
     template_headings: list[dict],
-    plan_md: str,
-    workplan_md: str,
-    wrapup_md: str,
+    sources: list[tuple[str, str]],
 ) -> AsyncIterator[str]:
-    per = MAX_CONTEXT_CHARS // 3
-    prompt = template_composer_user_prompt(
-        template_headings,
-        _truncate(plan_md, per),
-        _truncate(workplan_md, per),
-        _truncate(wrapup_md, per),
-    )
+    per = MAX_CONTEXT_CHARS // max(1, len(sources))
+    trimmed = [(n, _truncate(c, per)) for n, c in sources]
+    prompt = template_composer_user_prompt(template_headings, trimmed)
     provider = get_provider()
     async for chunk in provider.generate_text(prompt, system=TEMPLATE_COMPOSER_SYSTEM):
         yield chunk

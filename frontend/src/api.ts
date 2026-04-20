@@ -20,9 +20,7 @@ export function templateInjectSSE(
   body: {
     template_hwpx: string;
     output_hwpx: string;
-    plan_md: string;
-    workplan_md: string;
-    wrapup_md: string;
+    source_md_paths: string[];
   },
   onStart: (total: number) => void,
   onSectionBegin: (i: number, total: number, title: string) => void,
@@ -138,9 +136,7 @@ export function draftMdSSE(
   body: {
     template_hwpx: string;
     output_md: string;
-    plan_md: string;
-    workplan_md: string;
-    wrapup_md: string;
+    source_md_paths: string[];
   },
   onStart: (totalHeadings: number) => void,
   onChunk: (text: string) => void,
@@ -188,7 +184,7 @@ export function draftMdSSE(
 }
 
 export function composeSSE(
-  body: { plan_md: string; workplan_md: string; wrapup_md: string; output_md: string },
+  body: { source_md_paths: string[]; output_md: string },
   onChunk: (text: string) => void,
   onDone: (outPath: string) => void,
   onError: (err: string) => void

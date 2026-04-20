@@ -40,12 +40,22 @@ def template_headings(body: HeadingsBody) -> dict[str, Any]:
     return {"headings": headings}
 
 
+def _load_sources(md_paths: list[str]) -> list[tuple[str, str]]:
+    sources: list[tuple[str, str]] = []
+    for p in md_paths:
+        pp = Path(p)
+        if not pp.exists():
+            raise HTTPException(404, f"MD 없음: {p}")
+        sources.append((pp.stem, pp.read_text(encoding="utf-8")))
+    if not sources:
+        raise HTTPException(400, "최소 1개 MD 필요")
+    return sources
+
+
 class TemplateInjectBody(BaseModel):
     template_hwpx: str
     output_hwpx: str
-    plan_md: str
-    workplan_md: str
-    wrapup_md: str
+    source_md_paths: list[str]
     heading_filter: list[str] | None = None
 
 
@@ -53,9 +63,7 @@ class TemplateInjectBody(BaseModel):
 async def template_inject(body: TemplateInjectBody):
     if not Path(body.template_hwpx).exists():
         raise HTTPException(404, "템플릿 없음")
-    plan_text = Path(body.plan_md).read_text(encoding="utf-8")
-    workplan_text = Path(body.workplan_md).read_text(encoding="utf-8")
-    wrapup_text = Path(body.wrapup_md).read_text(encoding="utf-8")
+    sources = _load_sources(body.source_md_paths)
 
     try:
         headings = list_headings(body.template_hwpx)
@@ -81,7 +89,7 @@ async def template_inject(body: TemplateInjectBody):
             yield f"event: start\ndata: {len(targets)}\n\n"
             for i, title in enumerate(targets, 1):
                 yield f"event: section_begin\ndata: {i}/{len(targets)}::{title}\n\n"
-                body_text = await compose_section(title, plan_text, workplan_text, wrapup_text)
+                body_text = await compose_section(title, sources)
                 section_map[title] = body_text
                 preview = body_text[:80].replace("\n", " ")
                 yield f"event: section_done\ndata: {i}/{len(targets)}::{title}::{preview}\n\n"
@@ -99,30 +107,24 @@ async def template_inject(body: TemplateInjectBody):
 class DraftMdBody(BaseModel):
     template_hwpx: str
     output_md: str
-    plan_md: str
-    workplan_md: str
-    wrapup_md: str
+    source_md_paths: list[str]
 
 
 @router.post("/template/draft-md")
 async def template_draft_md(body: DraftMdBody):
     """
-    템플릿 HWPX의 헤딩 구조를 가져와 3개 MD와 합성 → 완성형 MD 1개를 생성.
+    템플릿 HWPX의 헤딩 구조 + N개 소스 MD를 합성해 완성형 MD 생성.
     사용자 검수용. LLM 1회 호출.
     """
     if not Path(body.template_hwpx).exists():
         raise HTTPException(404, "템플릿 없음")
-    plan_text = Path(body.plan_md).read_text(encoding="utf-8")
-    workplan_text = Path(body.workplan_md).read_text(encoding="utf-8")
-    wrapup_text = Path(body.wrapup_md).read_text(encoding="utf-8")
+    sources = _load_sources(body.source_md_paths)
 
     try:
         headings = list_headings(body.template_hwpx)
     except Exception as e:
         raise HTTPException(500, f"헤딩 추출 실패: {e}")
 
-    # 프롬프트용: 계층 유지를 위해 상위 범주(body=0)도 포함.
-    # TOC 꼬리 페이지번호(" 05" 등) 제거 후 dedup. body_paragraphs가 큰 쪽 우선.
     import re as _re
     toc_tail = _re.compile(r"\s+\d{1,3}\s*$")
     by_norm: dict[str, dict] = {}
@@ -140,7 +142,7 @@ async def template_draft_md(body: DraftMdBody):
         collected: list[str] = []
         try:
             yield f"event: start\ndata: {len(filtered)}\n\n"
-            async for chunk in compose_with_template_headings(filtered, plan_text, workplan_text, wrapup_text):
+            async for chunk in compose_with_template_headings(filtered, sources):
                 collected.append(chunk)
                 safe = chunk.replace("\r", "").replace("\n", "\\n")
                 yield f"data: {safe}\n\n"
