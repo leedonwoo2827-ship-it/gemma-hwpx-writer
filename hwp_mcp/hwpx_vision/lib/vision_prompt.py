@@ -96,12 +96,19 @@ def template_composer_user_prompt(
     workplan_md: str,
     wrapup_md: str,
 ) -> str:
-    hs = "\n".join(f"- L{h['level']} | {h['heading']}" for h in headings)
-    return f"""다음 템플릿 헤딩 목록을 그대로 사용해 결과보고서 Markdown을 작성하세요.
+    lines: list[str] = []
+    for h in headings:
+        indent = "  " * max(0, h["level"] - 1)
+        marker = {1: "##", 2: "###", 3: "####", 4: "#####", 5: "######"}.get(h["level"], "#####")
+        body_hint = f"  [본문 있음, {h['body_paragraphs']}단락 분량]" if h.get("body_paragraphs", 0) >= 3 else "  [범주/목차, 본문 짧거나 없음]"
+        lines.append(f"{indent}- {marker} {h['heading']}{body_hint}")
+    hs = "\n".join(lines)
+    return f"""다음 템플릿 헤딩 구조(계층 포함)를 그대로 사용해 결과보고서 Markdown을 작성하세요.
+들여쓰기는 계층을 나타내며, 각 헤딩 앞의 `##`, `###` 등은 실제 Markdown 출력에 그대로 써야 합니다.
 
-<템플릿 헤딩>
+<템플릿 헤딩 트리>
 {hs}
-</템플릿 헤딩>
+</템플릿 헤딩 트리>
 
 <계획서>
 {plan_md}

@@ -7,6 +7,7 @@ import RightSidebar from "./components/RightSidebar";
 import MdDropZone from "./components/MdDropZone";
 import DirectConvertBar from "./components/DirectConvertBar";
 import MdList from "./components/MdList";
+import InjectTargetPanel from "./components/InjectMdPanel";
 import { api, composeSSE, templateInjectSSE, draftMdSSE, FileNode } from "./api";
 
 const DEFAULT_ROOT = "_context";
@@ -423,6 +424,20 @@ export default function App() {
           onSelect={onSelect}
           onContextMenu={(path, ext, x, y) => setMenu({ path, ext, x, y })}
         />
+        <InjectTargetPanel
+          templateHwpx={styleRef}
+          active={selected === styleRef}
+          onClear={() => {
+            setStyleRef(null);
+            log("템플릿 해제됨");
+          }}
+          onSelect={() => {
+            if (styleRef) {
+              setSelected(styleRef);
+              setSelectedExt(".hwpx");
+            }
+          }}
+        />
       </div>
 
       <div className="center">
@@ -438,21 +453,7 @@ export default function App() {
 
       <div className="status">
         {workDir} · MD 선택 {effectiveMdSelection().length} · 결과 {results.length}
-        {styleRef && (
-          <>
-            {" · "}
-            <span style={{ color: "var(--accent)" }}>
-              템플릿: {styleRef.split(/[\\/]/).pop()}
-            </span>
-            <button
-              style={{ marginLeft: 6, padding: "0 6px", fontSize: 10 }}
-              onClick={() => setStyleRef(null)}
-              title="템플릿 해제"
-            >
-              ×
-            </button>
-          </>
-        )}
+        {styleRef && <> · <span style={{ color: "var(--accent)" }}>템플릿 지정됨 ✓</span></>}
       </div>
 
       {menu && (

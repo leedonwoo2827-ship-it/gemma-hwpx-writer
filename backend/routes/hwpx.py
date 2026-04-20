@@ -121,15 +121,17 @@ async def template_draft_md(body: DraftMdBody):
     except Exception as e:
         raise HTTPException(500, f"헤딩 추출 실패: {e}")
 
-    seen: set[str] = set()
-    filtered: list[dict] = []
+    # 프롬프트용: 계층 유지를 위해 상위 범주(body=0)도 포함.
+    # TOC 꼬리 페이지번호(" 05" 등) 제거 후 dedup. body_paragraphs가 큰 쪽 우선.
+    import re as _re
+    toc_tail = _re.compile(r"\s+\d{1,3}\s*$")
+    by_norm: dict[str, dict] = {}
     for h in headings:
-        if h["body_paragraphs"] < 3:
-            continue
-        if h["heading"] in seen:
-            continue
-        seen.add(h["heading"])
-        filtered.append(h)
+        norm = toc_tail.sub("", h["heading"]).strip()
+        existing = by_norm.get(norm)
+        if existing is None or h.get("body_paragraphs", 0) > existing.get("body_paragraphs", 0):
+            by_norm[norm] = {**h, "heading": norm}
+    filtered = list(by_norm.values())
 
     out = Path(body.output_md)
     out.parent.mkdir(parents=True, exist_ok=True)
