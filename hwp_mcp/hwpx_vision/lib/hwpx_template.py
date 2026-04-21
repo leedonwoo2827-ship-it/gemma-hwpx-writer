@@ -281,31 +281,17 @@ def _pick_canonical_body_template(
     all_section_xmls: list[Path],
 ) -> Optional[etree._Element]:
     """
-    문서 전체에서 본문 스타일 기준 단락 1개를 골라 반환.
-    우선순위: 첫 번째 ○ 단락 > 첫 번째 - 단락 > 첫 번째 일반 본문 단락.
-    모든 섹션의 모든 라인이 이 스타일을 그대로 쓴다 (일괄 통일).
+    문서 전체에서 '가장 먼저 나오는 본문 단락' 하나를 반환.
+    기호 우선순위 없이 문서 순서 그대로. 모든 섹션의 모든 라인이 이 스타일을 재사용 (일괄 통일).
     """
-    first_bullet = None
-    first_dash = None
-    first_plain = None
     for sx in all_section_xmls:
         _, paragraphs, sections = parse_sections(sx)
         for sec in sections:
             for idx in sec.body_indices:
                 p = paragraphs[idx]
-                txt = _paragraph_text(p)
-                if not txt:
-                    continue
-                m = _line_marker(txt)
-                if m == "○" and first_bullet is None:
-                    first_bullet = etree.fromstring(etree.tostring(p))
-                elif m == "-" and first_dash is None:
-                    first_dash = etree.fromstring(etree.tostring(p))
-                elif m == "" and first_plain is None:
-                    first_plain = etree.fromstring(etree.tostring(p))
-                if first_bullet is not None:
-                    return _strip_and_clear(first_bullet)
-    return _strip_and_clear(first_bullet or first_dash or first_plain)
+                if _paragraph_text(p):
+                    return _strip_and_clear(etree.fromstring(etree.tostring(p)))
+    return None
 
 
 def _strip_and_clear(p: Optional[etree._Element]) -> Optional[etree._Element]:
