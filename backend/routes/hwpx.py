@@ -259,7 +259,7 @@ def template_inject_from_md(body: InjectFromMdBody) -> dict[str, Any]:
         raise HTTPException(404, "MD 없음")
 
     md_text = Path(body.md_path).read_text(encoding="utf-8")
-    md_sections = parse_md_sections(md_text)
+    md_sections = parse_md_sections(md_text, section_level=6)  # 모든 레벨을 경계로 — 템플릿 헤딩과 직접 매칭
 
     try:
         headings = list_headings(body.template_hwpx)
