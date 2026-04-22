@@ -181,11 +181,12 @@ def template_inject_with_layout(body: InjectWithLayoutBody) -> dict[str, Any]:
     md_text = Path(body.md_path).read_text(encoding="utf-8")
     md_sections = parse_md_sections(md_text)
 
-    heading_list: list[str] = []
+    # MD 의 모든 헤딩이 항상 출력에 포함되도록 보장. 주입 문서(있을 경우)는
+    # MD 에 없는 헤딩만 보조로 추가 (예전 템플릿 섹션 유지 용도).
+    heading_list: list[str] = list(md_sections.keys())
+    md_heading_set = set(heading_list)
 
-    if body.injection_hwpx:
-        if not Path(body.injection_hwpx).exists():
-            raise HTTPException(404, "주입 문서 없음")
+    if body.injection_hwpx and Path(body.injection_hwpx).exists():
         try:
             injection_headings = list_headings(body.injection_hwpx)
         except Exception as e:
@@ -193,7 +194,7 @@ def template_inject_with_layout(body: InjectWithLayoutBody) -> dict[str, Any]:
 
         import re as _re
         toc_tail = _re.compile(r"\s+\d{1,3}\s*$")
-        seen: set[str] = set()
+        seen: set[str] = set(md_heading_set)
         for h in injection_headings:
             if h["body_paragraphs"] < 3:
                 continue
@@ -202,20 +203,16 @@ def template_inject_with_layout(body: InjectWithLayoutBody) -> dict[str, Any]:
                 continue
             seen.add(norm)
             heading_list.append(norm)
-    else:
-        # MD 자체의 헤딩을 순서대로
-        heading_list = list(md_sections.keys())
 
     if not heading_list:
         raise HTTPException(
             400,
-            "헤딩 리스트를 만들 수 없음. 주입 문서에 유효 헤딩이 없거나 MD 에 # 헤딩이 없음.",
+            "헤딩 리스트를 만들 수 없음. MD 에 # 헤딩이 없고 주입 문서도 비어있음.",
         )
 
+    heading_to_body = dict(md_sections)
     if body.injection_hwpx:
-        heading_to_body = match_to_template_headings(md_sections, heading_list)
-    else:
-        heading_to_body = dict(md_sections)
+        heading_to_body.update(match_to_template_headings(md_sections, heading_list))
     for h in heading_list:
         heading_to_body.setdefault(h, "")
 
