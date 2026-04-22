@@ -166,7 +166,17 @@ def _set_paragraph_text(p_elem: etree._Element, text: str) -> None:
             t.text = text
 
 
-KNOWN_MARKERS = ("○", "•", "·", "△", "▲", "※", "◦", "–", "—", "-", "▪", "■")
+KNOWN_MARKERS = ("○", "•", "·", "△", "▲", "※", "◦", "–", "—", "-", "▪", "■", "□", "◆", "◇")
+
+
+def _strip_leading_marker(text: str) -> str:
+    """선두 머리 기호와 공백 제거 (템플릿 단락이 이미 기호를 자동 렌더하므로 중복 방지)."""
+    s = text.lstrip()
+    for m in KNOWN_MARKERS:
+        if s.startswith(m):
+            s = s[len(m):].lstrip()
+            return s
+    return s
 
 
 def _line_marker(text: str) -> str:
@@ -493,15 +503,18 @@ def render_with_baseline_layout(
             cloned = _clone_block(template_block)
             for el in cloned:
                 _strip_layout_cache(el)
-                # paraPrIDRef / styleIDRef 는 보존 → 양식의 자동 번호(1→2→3…) 유지
+                # paraPrIDRef / styleIDRef 는 보존 → 양식의 들여쓰기·폰트·hanging indent 유지
 
-            # 첫 단락 = 헤딩
+            # 첫 단락 = 헤딩. 양식의 자동 번호가 멀티레벨(1.1 같은) 일 수 있어 제거하고
+            # 텍스트로 직접 "1. XXX" / "가. XXX" 를 써넣는다.
             heading_p = cloned[0]
+            _strip_auto_numbering(heading_p)
             _set_paragraph_text(heading_p, heading_text)
 
             # 나머지 단락들: body 채움. 표 내부 단락은 건드리지 않음.
+            # MD 라인의 선두 기호(○/-/□ 등) 제거 → 템플릿 단락의 자동 기호 렌더와 이중 표기 방지.
             body_text = heading_to_body.get(heading_text, "").strip()
-            body_lines = [ln for ln in body_text.split("\n") if ln.strip()]
+            body_lines = [_strip_leading_marker(ln) for ln in body_text.split("\n") if ln.strip()]
 
             body_ps: list[etree._Element] = []
             for el in cloned[1:]:
