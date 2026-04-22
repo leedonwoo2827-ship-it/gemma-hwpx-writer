@@ -414,16 +414,15 @@ def _find_section_start_loose(root: etree._Element) -> Optional[int]:
     return None
 
 
-def _find_next_section_start_loose(root: etree._Element, start: int, first_heading_para_pr_ref: Optional[str]) -> Optional[int]:
+def _find_next_section_start_loose(
+    root: etree._Element,
+    start: int,
+    first_heading_level: Optional[int] = None,
+) -> Optional[int]:
     """
-    양식 내 '다음 섹션 시작' 감지. 보통 양식은 섹션 1개이므로 None 이 정상.
-    동일한 paraPrIDRef 를 가진 다른 짧은 단락이 있으면 그걸 다음 섹션 시작으로 본다.
+    양식 내 '다음 섹션 시작' 감지. first 헤딩 레벨보다 깊은 sub-heading(가./A./(1)) 은
+    같은 섹션 본문으로 취급하고, 같은 레벨 이상의 헤딩만 다음 섹션 경계로 사용.
     """
-    strict = _find_heading_index(root, start)
-    if strict is not None:
-        return strict
-    if not first_heading_para_pr_ref:
-        return None
     children = list(root)
     for i in range(start, len(children)):
         elem = children[i]
@@ -431,9 +430,10 @@ def _find_next_section_start_loose(root: etree._Element, start: int, first_headi
             continue
         if _is_inside_table(elem):
             continue
-        if elem.get("paraPrIDRef") == first_heading_para_pr_ref:
-            txt = _paragraph_text(elem)
-            if txt and len(txt) <= 30 and not any(kw in txt for kw in SAMPLE_META_KEYWORDS):
+        txt = _paragraph_text(elem)
+        if txt and _is_heading(txt):
+            lvl = _heading_level(txt)
+            if first_heading_level is None or lvl <= first_heading_level:
                 return i
     return None
 
@@ -488,8 +488,9 @@ def render_with_baseline_layout(
         root = tree.getroot()
         children = list(root)
 
-        first_para_pr_ref = children[first_idx].get("paraPrIDRef")
-        next_idx = _find_next_section_start_loose(root, first_idx + 1, first_para_pr_ref)
+        first_heading_text = _paragraph_text(children[first_idx])
+        first_heading_level = _heading_level(first_heading_text) if _is_heading(first_heading_text) else None
+        next_idx = _find_next_section_start_loose(root, first_idx + 1, first_heading_level)
         end_idx = next_idx if next_idx is not None else len(children)
 
         template_block = children[first_idx:end_idx]
