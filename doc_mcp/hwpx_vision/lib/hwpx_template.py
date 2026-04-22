@@ -172,12 +172,27 @@ CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
 
 
 MD_LEVEL_TO_MARKER = {
-    1: "L1_NUM",
-    2: "L2_HAN",
-    3: "L3_UPPER",
-    4: "L4_PAREN",
-    5: "L5_CIRCLED",
-    6: "L6_ROMAN",
+    1: "L1_POS",
+    2: "L2_POS",
+    3: "L3_POS",
+    4: "L4_POS",
+    5: "L5_POS",
+    6: "L6_POS",
+}
+
+# 호환용: 기호 기반 분류 결과 → 위치 기반 키로 연결하는 기본 맵
+MARKER_TO_POS_FALLBACK = {
+    "L1_NUM": "L1_POS",
+    "L2_HAN": "L2_POS",
+    "L3_UPPER": "L3_POS",
+    "L4_PAREN": "L4_POS",
+    "L5_CIRCLED": "L5_POS",
+    "L6_ROMAN": "L6_POS",
+    "BULLET_CIRCLE": "L3_POS",
+    "DASH": "L4_POS",
+    "BULLET_SHAPE": "L3_POS",
+    "BULLET_DIAMOND": "L3_POS",
+    "NOTE": "L6_POS",
 }
 
 
@@ -248,14 +263,32 @@ MARKER_FALLBACK_CHAIN: dict[str, list[str]] = {
 
 
 def _resolve_template(marker_pool: dict, key: str, fallback_body) -> Optional[etree._Element]:
-    """마커 키로 양식 단락을 찾되, 없으면 MARKER_FALLBACK_CHAIN 순서대로 시도."""
+    """
+    양식 단락을 찾는 우선순위:
+    1. key 가 L{n}_POS 면 해당 위치 단락
+    2. key 가 기호(BULLET/DASH/L*_NUM) 면 POS 변환 후 시도
+    3. 일반 fallback chain
+    """
     src = marker_pool.get(key)
     if src is not None:
         return src
+
+    pos_key = MARKER_TO_POS_FALLBACK.get(key)
+    if pos_key:
+        src = marker_pool.get(pos_key)
+        if src is not None:
+            return src
+
     for fb in MARKER_FALLBACK_CHAIN.get(key, []):
         src = marker_pool.get(fb)
         if src is not None:
             return src
+        pos = MARKER_TO_POS_FALLBACK.get(fb)
+        if pos:
+            src = marker_pool.get(pos)
+            if src is not None:
+                return src
+
     return marker_pool.get("PLAIN") or fallback_body
 
 
@@ -614,9 +647,13 @@ def render_with_baseline_layout(
         for elem in template_block:
             root.remove(elem)
 
-        # 양식 템플릿에서 마커별 대표 단락 추출 (첫 헤딩 제외)
+        # 양식 템플릿에서 단락 추출
+        # 1) 위치 기반 키 (L1_POS ~ L6_POS): 첫 헤딩이 L1, 이후 순서대로 L2/L3/L4/…
+        #    → 양식에 쓴 실제 기호(○/-/·/※ 등)와 무관하게 레벨 매핑 가능
+        # 2) 기호 기반 키 (L1_NUM/L2_HAN/…/DASH/BULLET_*): 호환 및 폴백용
         marker_pool: dict[str, etree._Element] = {}
-        for el in template_block[1:]:
+        pos_idx = 1
+        for i, el in enumerate(template_block):
             if etree.QName(el).localname != "p":
                 continue
             if _is_inside_table(el):
@@ -624,9 +661,17 @@ def render_with_baseline_layout(
             txt = _paragraph_text(el)
             if not txt:
                 continue
-            key = _classify_line_marker(txt)
-            if key not in marker_pool:
-                marker_pool[key] = el
+            # 위치 기반 (template_block 의 non-empty 단락 순서 = L1, L2, ...)
+            pos_key = f"L{pos_idx}_POS"
+            if pos_key not in marker_pool:
+                marker_pool[pos_key] = el
+            pos_idx += 1
+            # 기호 기반 (호환)
+            if i == 0:
+                continue  # 첫 헤딩은 기호 풀에서 제외
+            marker_key = _classify_line_marker(txt)
+            if marker_key not in marker_pool:
+                marker_pool[marker_key] = el
         fallback_body = template_block[-1] if template_block else None
 
         insert_pos = first_idx
