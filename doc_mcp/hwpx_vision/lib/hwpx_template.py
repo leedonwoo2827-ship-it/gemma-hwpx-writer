@@ -647,9 +647,9 @@ def render_with_baseline_layout(
                     continue
                 new_p = etree.fromstring(etree.tostring(src))
                 _strip_layout_cache(new_p)
-                # body 단락도 자동번호 제거 → 양식의 'A.' 등 자동 마커와 MD 의
-                # '○/-/·' 기호가 이중으로 찍히지 않게 함
-                _strip_auto_numbering(new_p)
+                # body 단락은 paraPrIDRef/styleIDRef 를 유지해 들여쓰기·폰트 계승.
+                # 자동 번호 제거 안 함 — 양식에서 자동 번호/굵기 설정은 사용자가
+                # 해당 단락 스타일에서 해제 (헤딩과 달리 body 는 양식 스타일 의존)
                 _set_paragraph_text(new_p, _strip_md_heading_prefix(line))
                 section_elems.append(new_p)
 
