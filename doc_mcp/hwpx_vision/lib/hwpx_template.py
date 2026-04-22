@@ -168,6 +168,44 @@ def _set_paragraph_text(p_elem: etree._Element, text: str) -> None:
 
 KNOWN_MARKERS = ("○", "•", "·", "△", "▲", "※", "◦", "–", "—", "-", "▪", "■", "□", "◆", "◇")
 
+CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
+
+
+def _classify_line_marker(text: str) -> str:
+    """
+    한 줄의 마커 유형을 분류해 일관된 키로 반환.
+    매칭된 양식 단락을 찾는 데 사용.
+    """
+    if not text:
+        return "PLAIN"
+    s = text.lstrip()
+    if re.match(r"^\d+\.\s+", s):
+        return "L1_NUM"          # 1. xxx
+    if re.match(r"^[가-힣]\.\s+", s):
+        return "L2_HAN"          # 가. xxx
+    if re.match(r"^[A-Z]\.\s+", s):
+        return "L3_UPPER"        # A. xxx
+    if re.match(r"^\([가-힣\d]\)\s+", s):
+        return "L4_PAREN"        # (1) / (가)
+    if s and s[0] in CIRCLED_DIGITS:
+        return "L5_CIRCLED"      # ① xxx
+    if re.match(r"^[ivxIVX]+\.\s+", s):
+        return "L6_ROMAN"        # i. xxx / I. xxx
+    for m in ("○", "•", "·", "◦"):
+        if s.startswith(m):
+            return "BULLET_CIRCLE"
+    for m in ("△", "▲", "▪", "■", "□"):
+        if s.startswith(m):
+            return "BULLET_SHAPE"
+    for m in ("◆", "◇"):
+        if s.startswith(m):
+            return "BULLET_DIAMOND"
+    if s.startswith("※"):
+        return "NOTE"
+    if s.startswith("-") or s.startswith("–") or s.startswith("—"):
+        return "DASH"
+    return "PLAIN"
+
 
 def _strip_leading_marker(text: str) -> str:
     """선두 머리 기호와 공백 제거 (템플릿 단락이 이미 기호를 자동 렌더하므로 중복 방지)."""
@@ -524,58 +562,51 @@ def render_with_baseline_layout(
         for elem in template_block:
             root.remove(elem)
 
+        # 양식 템플릿에서 마커별 대표 단락 추출 (첫 헤딩 제외)
+        marker_pool: dict[str, etree._Element] = {}
+        for el in template_block[1:]:
+            if etree.QName(el).localname != "p":
+                continue
+            if _is_inside_table(el):
+                continue
+            txt = _paragraph_text(el)
+            if not txt:
+                continue
+            key = _classify_line_marker(txt)
+            if key not in marker_pool:
+                marker_pool[key] = el
+        fallback_body = template_block[-1] if template_block else None
+
         insert_pos = first_idx
         for heading_text in headings:
-            cloned = _clone_block(template_block)
-            cloned = _strip_tables_from_block(cloned)
-            for el in cloned:
-                _strip_layout_cache(el)
-                # paraPrIDRef / styleIDRef 는 보존 → 양식의 들여쓰기·폰트·hanging indent 유지
+            heading_clone = etree.fromstring(etree.tostring(template_block[0]))
+            _strip_layout_cache(heading_clone)
+            _strip_auto_numbering(heading_clone)
+            _set_paragraph_text(heading_clone, heading_text)
 
-            # 첫 단락 = 헤딩. 양식의 자동 번호가 멀티레벨(1.1 같은) 일 수 있어 제거하고
-            # 텍스트로 직접 "1. XXX" / "가. XXX" 를 써넣는다.
-            heading_p = cloned[0]
-            _strip_auto_numbering(heading_p)
-            _set_paragraph_text(heading_p, heading_text)
-
-            # 나머지 단락들: body 채움. 표 내부 단락은 건드리지 않음.
-            # MD 라인의 기호는 그대로 둠 (양식의 단락 스타일에 자동 기호가 없다는 전제).
             body_text = heading_to_body.get(heading_text, "").strip()
             body_lines = [ln for ln in body_text.split("\n") if ln.strip()]
 
-            body_ps: list[etree._Element] = []
-            for el in cloned[1:]:
-                if etree.QName(el).localname != "p":
+            section_elems: list[etree._Element] = [heading_clone]
+            for line in body_lines:
+                key = _classify_line_marker(line)
+                src = marker_pool.get(key)
+                if src is None:
+                    src = marker_pool.get("PLAIN")
+                if src is None:
+                    src = fallback_body
+                if src is None:
                     continue
-                if _is_inside_table(el):
-                    continue
-                body_ps.append(el)
+                new_p = etree.fromstring(etree.tostring(src))
+                _strip_layout_cache(new_p)
+                _set_paragraph_text(new_p, line)
+                section_elems.append(new_p)
 
-            if body_ps:
-                for i, line in enumerate(body_lines):
-                    if i < len(body_ps):
-                        _set_paragraph_text(body_ps[i], line)
-                    else:
-                        new_p = etree.fromstring(etree.tostring(body_ps[-1]))
-                        _strip_layout_cache(new_p)
-                        _set_paragraph_text(new_p, line)
-                        # heading 바로 뒤가 아니라, 마지막 body_p 다음에 넣어야 순서 유지
-                        last_body_p = body_ps[-1]
-                        parent = last_body_p.getparent()
-                        if parent is not None:
-                            last_body_p.addnext(new_p)
-                        body_ps.append(new_p)
-                        # cloned 리스트에도 추가 (insert 순서 유지)
-                        idx_last = cloned.index(last_body_p)
-                        cloned.insert(idx_last + 1, new_p)
+            section_elems = _strip_tables_from_block(section_elems)
 
-                # body_lines 보다 body_ps 가 많으면 남는 단락 비움
-                for j in range(len(body_lines), len(body_ps)):
-                    _set_paragraph_text(body_ps[j], "")
-
-            for offset, elem in enumerate(cloned):
+            for offset, elem in enumerate(section_elems):
                 root.insert(insert_pos + offset, elem)
-            insert_pos += len(cloned)
+            insert_pos += len(section_elems)
 
         tree.write(str(target_xml), xml_declaration=True, encoding="UTF-8", standalone=True)
         _repack(tmp, output_hwpx)
