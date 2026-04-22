@@ -171,7 +171,12 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
               ⚠ Gemini API 사용 시 문서가 Google 서버로 전송됩니다. 대외비 자료는 Ollama 권장.
             </div>
             <div className="field">
-              <label>Gemini API Key</label>
+              <label>
+                Gemini API Key
+                {cfg.gemini_api_key && cfg.gemini_api_key.startsWith("***") && (
+                  <span style={{ marginLeft: 8, fontSize: 10, color: "var(--green)" }}>✓ 저장된 키 유지 중</span>
+                )}
+              </label>
               <input
                 type="password"
                 value={cfg.gemini_api_key || ""}
@@ -184,7 +189,7 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
                 placeholder="AIza..."
               />
               <div style={{ fontSize: 10, color: "var(--fg-dim)", marginTop: 2 }}>
-                키 입력 후 포커스 빠지면 계정 사용 가능 모델 자동 조회
+                키 입력 후 포커스 빠지면 계정 사용 가능 모델 자동 조회. 저장된 키는 ✓로 표시되며 건드리지 않으면 그대로 유지됨. 새 키로 바꾸려면 입력창 비우고 다시 붙여넣기.
               </div>
             </div>
 

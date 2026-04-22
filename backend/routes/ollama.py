@@ -51,7 +51,13 @@ def get_config() -> dict[str, Any]:
 
 @router.post("/config")
 def set_config(body: ConfigBody) -> dict[str, Any]:
-    save_config(body.model_dump())
+    new_cfg = body.model_dump()
+    # 마스크된 값(***XXXX) 이나 빈 값으로 저장된 키를 덮어쓰지 않는다
+    existing = load_config()
+    incoming_key = new_cfg.get("gemini_api_key", "")
+    if not incoming_key or incoming_key.startswith("***"):
+        new_cfg["gemini_api_key"] = existing.get("gemini_api_key", "")
+    save_config(new_cfg)
     return {"ok": True}
 
 
