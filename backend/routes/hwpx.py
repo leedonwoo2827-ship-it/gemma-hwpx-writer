@@ -17,7 +17,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from doc_mcp.hwpx_vision.tools.template_inject import list_headings, inject_to_template, inject_with_layout
-from doc_mcp.hwpx_vision.lib.md_sections import parse_md_sections, match_to_template_headings
+from doc_mcp.hwpx_vision.lib.md_sections import parse_md_sections, match_to_template_headings, promote_headings_to_top
 
 
 router = APIRouter(prefix="/api", tags=["hwpx"])
@@ -146,7 +146,9 @@ async def template_draft_md(body: DraftMdBody):
                 collected.append(chunk)
                 safe = chunk.replace("\r", "").replace("\n", "\\n")
                 yield f"data: {safe}\n\n"
-            out.write_text("".join(collected), encoding="utf-8")
+            # 가장 얕은 헤딩이 # 가 되도록 자동 승격 (## 으로 시작하면 # 으로 당김)
+            final_md = promote_headings_to_top("".join(collected))
+            out.write_text(final_md, encoding="utf-8")
             yield f"event: done\ndata: {out}\n\n"
         except Exception as e:
             import traceback

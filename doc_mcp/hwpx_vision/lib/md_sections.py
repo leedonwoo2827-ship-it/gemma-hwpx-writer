@@ -7,6 +7,32 @@ import re
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 
 
+def promote_headings_to_top(md_text: str) -> str:
+    """
+    가장 얕은 헤딩 레벨이 `#` 가 되도록 전체 헤딩을 위로 당긴다.
+    예) MD 가 ##/###/#### 로 시작 → shallowest=2 → shift=1 →
+        ## / ### / #### → # / ## / ###
+    """
+    lines = md_text.split("\n")
+    shallowest = 7
+    for ln in lines:
+        m = re.match(r"^(#{1,6})\s+", ln)
+        if m:
+            shallowest = min(shallowest, len(m.group(1)))
+    if shallowest <= 1 or shallowest > 6:
+        return md_text
+    shift = shallowest - 1
+    out: list[str] = []
+    for ln in lines:
+        m = re.match(r"^(#{1,6})\s+(.+)$", ln)
+        if m:
+            new_count = max(1, len(m.group(1)) - shift)
+            out.append("#" * new_count + " " + m.group(2))
+        else:
+            out.append(ln)
+    return "\n".join(out)
+
+
 def parse_md_sections(md_text: str, section_level: int | None = None) -> dict[str, str]:
     """
     Markdown을 헤딩(#, ##, ###...)으로 나눠 섹션 맵을 만든다.
