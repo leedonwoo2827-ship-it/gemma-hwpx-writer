@@ -139,9 +139,14 @@ def _strip_layout_cache(elem: etree._Element) -> None:
 
 
 def _clone_as_template(p_elem: etree._Element) -> etree._Element:
-    """기존 단락을 복제해 템플릿으로 사용 (스타일 유지, 위치 캐시 제거)."""
+    """기존 단락을 복제해 템플릿으로 사용 (스타일 유지, 위치 캐시/자동 번호 제거)."""
     clone = etree.fromstring(etree.tostring(p_elem))
     _strip_layout_cache(clone)
+    # _strip_auto_numbering 은 파일 뒤쪽 정의 — 런타임 시점엔 이미 로드되어 있음
+    try:
+        _strip_auto_numbering(clone)
+    except NameError:
+        pass
     for t in clone.xpath(".//hp:t", namespaces=NS):
         t.text = ""
     return clone
@@ -323,10 +328,28 @@ def _pick_canonical_templates_by_marker(
     return by_marker, default
 
 
+def _strip_auto_numbering(p: etree._Element) -> None:
+    """
+    자동 번호 매기기 (paraPrIDRef, styleIDRef 가 가리키는 '가.나.다…' 스타일) 해제.
+    단락 내부의 번호 관련 <hp:numPr>, <hp:autoNumFormat> 도 제거.
+    """
+    for attr in ("paraPrIDRef", "styleIDRef"):
+        if attr in p.attrib:
+            del p.attrib[attr]
+    for local in ("numPr", "autoNumFormat", "numbering", "listLevel"):
+        for el in p.iter():
+            if etree.QName(el).localname == local:
+                parent = el.getparent()
+                if parent is not None:
+                    parent.remove(el)
+                break
+
+
 def _strip_and_clear(p: Optional[etree._Element]) -> Optional[etree._Element]:
     if p is None:
         return None
     _strip_layout_cache(p)
+    _strip_auto_numbering(p)
     for t in p.xpath(".//hp:t", namespaces=NS):
         t.text = ""
     return p
