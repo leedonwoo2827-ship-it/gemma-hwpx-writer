@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m 'feat: 섹션 블록 복제 시 표\\(hp:tbl\\) 자동 제거 *)"
+    ]
+  }
+}

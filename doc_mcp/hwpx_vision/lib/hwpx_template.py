@@ -442,6 +442,32 @@ def _clone_block(elements: list[etree._Element]) -> list[etree._Element]:
     return [etree.fromstring(etree.tostring(e)) for e in elements]
 
 
+def _strip_tables_from_block(cloned: list[etree._Element]) -> list[etree._Element]:
+    """
+    복제된 블록에서 표(<hp:tbl>) 및 표만 포함한 단락을 제거.
+    양식의 샘플 표가 섹션 수만큼 반복 복제되는 것 방지.
+    """
+    result: list[etree._Element] = []
+    for elem in cloned:
+        # 1) 요소 자체가 hp:tbl 이면 제거
+        if etree.QName(elem).localname == "tbl":
+            continue
+        # 2) 요소 내부의 <hp:tbl> 제거 (run 안에 있는 경우)
+        for tbl in list(elem.iter()):
+            if etree.QName(tbl).localname == "tbl":
+                parent = tbl.getparent()
+                if parent is not None:
+                    parent.remove(tbl)
+        # 3) 빈 단락이 된 경우(텍스트 없고 표만 있던 단락)도 제거
+        if etree.QName(elem).localname == "p":
+            txt = _paragraph_text(elem)
+            has_pic = any(etree.QName(e).localname in ("pic", "container", "rect", "line", "lineShape", "recShape") for e in elem.iter())
+            if not txt and not has_pic:
+                continue
+        result.append(elem)
+    return result
+
+
 def render_with_baseline_layout(
     sample_hwpx: str,
     headings: list[str],
@@ -502,6 +528,7 @@ def render_with_baseline_layout(
         insert_pos = first_idx
         for heading_text in headings:
             cloned = _clone_block(template_block)
+            cloned = _strip_tables_from_block(cloned)
             for el in cloned:
                 _strip_layout_cache(el)
                 # paraPrIDRef / styleIDRef 는 보존 → 양식의 들여쓰기·폰트·hanging indent 유지
