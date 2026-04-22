@@ -359,16 +359,29 @@ def render_from_template(
     template_hwpx: str,
     section_to_body: dict[str, str],
     output_hwpx: str,
+    style_source_hwpx: Optional[str] = None,
 ) -> dict:
     """
     템플릿 HWPX를 열어 모든 section XML을 순회하며 매칭되는 섹션 본문을 교체.
-    기호별(○/-/△/…)로 문서 전체에 통일된 스타일을 적용한다.
+    기호별(○/-/△/…) 문서 전체에 통일된 스타일.
+
+    style_source_hwpx 지정 시: 본문 단락 스타일(글자/문단)을 이 파일에서 가져옴.
+      - 글쓰기 주입 대상은 template_hwpx (구조·표지·표 유지)
+      - 디자인은 style_source_hwpx (깨끗한 본문 서식 차용)
     """
     replaced = 0
     with tempfile.TemporaryDirectory() as tmp:
         _extract(template_hwpx, tmp)
         section_xmls = _find_all_section_xmls(tmp)
-        marker_templates, default_template = _pick_canonical_templates_by_marker(section_xmls)
+
+        if style_source_hwpx and Path(style_source_hwpx).exists():
+            with tempfile.TemporaryDirectory() as style_tmp:
+                _extract(style_source_hwpx, style_tmp)
+                style_section_xmls = _find_all_section_xmls(style_tmp)
+                marker_templates, default_template = _pick_canonical_templates_by_marker(style_section_xmls)
+        else:
+            marker_templates, default_template = _pick_canonical_templates_by_marker(section_xmls)
+
         for section_xml in section_xmls:
             _, _, sections = parse_sections(section_xml)
             matching = {s.heading_text: section_to_body[s.heading_text] for s in sections if s.heading_text in section_to_body}

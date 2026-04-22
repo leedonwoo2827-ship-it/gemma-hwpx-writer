@@ -19,9 +19,12 @@ def inject_to_template(
     template_hwpx: str,
     section_to_body: dict[str, str],
     output_hwpx: str,
+    style_source_hwpx: str | None = None,
 ) -> dict[str, Any]:
     if not Path(template_hwpx).exists():
         raise FileNotFoundError(template_hwpx)
+    if style_source_hwpx and not Path(style_source_hwpx).exists():
+        style_source_hwpx = None
     Path(output_hwpx).parent.mkdir(parents=True, exist_ok=True)
     cleaned = {title: clean_markdown(body) for title, body in section_to_body.items()}
-    return render_from_template(template_hwpx, cleaned, output_hwpx)
+    return render_from_template(template_hwpx, cleaned, output_hwpx, style_source_hwpx=style_source_hwpx)

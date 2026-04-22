@@ -160,12 +160,16 @@ class InjectFromMdBody(BaseModel):
     template_hwpx: str
     md_path: str
     output_hwpx: str
+    style_hwpx: str | None = None
 
 
 @router.post("/template/inject-from-md")
 def template_inject_from_md(body: InjectFromMdBody) -> dict[str, Any]:
     """
     이미 작성된 MD를 템플릿 헤딩에 매칭해 주입. LLM 호출 없음.
+
+    style_hwpx 지정 시: 본문 단락 스타일을 이 파일에서 차용한다
+      (글쓰기 주입 = template_hwpx, 디자인 주입 = style_hwpx 로 역할 분리).
     """
     if not Path(body.template_hwpx).exists():
         raise HTTPException(404, "템플릿 없음")
@@ -187,12 +191,22 @@ def template_inject_from_md(body: InjectFromMdBody) -> dict[str, Any]:
         raise HTTPException(400, f"MD 헤딩({len(md_sections)})과 템플릿 헤딩({len(template_heading_texts)}) 매칭 실패")
 
     try:
-        result = inject_to_template(body.template_hwpx, section_map, body.output_hwpx)
+        result = inject_to_template(
+            body.template_hwpx,
+            section_map,
+            body.output_hwpx,
+            style_source_hwpx=body.style_hwpx,
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(500, f"주입 실패: {e}")
-    return {**result, "matched_sections": list(section_map.keys()), "md_sections_total": len(md_sections)}
+    return {
+        **result,
+        "matched_sections": list(section_map.keys()),
+        "md_sections_total": len(md_sections),
+        "style_source": body.style_hwpx,
+    }
 
 
 class AnalyzeBody(BaseModel):

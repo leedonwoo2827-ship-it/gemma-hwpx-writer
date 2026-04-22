@@ -7,6 +7,7 @@ import RightSidebar from "./components/RightSidebar";
 import MdDropZone from "./components/MdDropZone";
 import MdList from "./components/MdList";
 import InjectTargetPanel from "./components/InjectMdPanel";
+import StyleFormatPanel from "./components/StyleFormatPanel";
 import { api, composeSSE, draftMdSSE, pptxDraftMdSSE, FileNode } from "./api";
 
 const DEFAULT_ROOT = "_context";
@@ -45,11 +46,17 @@ export default function App() {
   const [tree, setTree] = useState<FileNode | null>(null);
   const [treeErr, setTreeErr] = useState<string | null>(null);
   const [styleRef, setStyleRef] = useState<string | null>(() => localStorage.getItem("styleRef"));
+  const [formatRef, setFormatRef] = useState<string | null>(() => localStorage.getItem("formatRef"));
 
   useEffect(() => {
     if (styleRef) localStorage.setItem("styleRef", styleRef);
     else localStorage.removeItem("styleRef");
   }, [styleRef]);
+
+  useEffect(() => {
+    if (formatRef) localStorage.setItem("formatRef", formatRef);
+    else localStorage.removeItem("formatRef");
+  }, [formatRef]);
 
   useEffect(() => {
     if (!workDir) return;
@@ -235,13 +242,14 @@ export default function App() {
     beginBusy(hasTemplate ? "HWPX 생성 (템플릿 주입)" : "HWPX 생성 (단순 변환)");
     try {
       if (hasTemplate) {
-        log(`HWPX 생성: ${selected} → 템플릿 주입`);
+        log(`HWPX 생성: ${selected} → 템플릿 주입${formatRef ? " (+ 양식)" : ""}`);
         const r = await api.injectFromMd({
           template_hwpx: styleRef!,
           md_path: selected,
           output_hwpx: outputHwpx,
+          style_hwpx: formatRef || undefined,
         });
-        log(`완료: ${r.path} (${r.bytes} bytes, ${r.sections_replaced}/${r.md_sections_total} 섹션 매칭)`);
+        log(`완료: ${r.path} (${r.bytes} bytes, ${r.sections_replaced}/${r.md_sections_total} 섹션 매칭)${formatRef ? " · 양식 차용" : ""}`);
         addResult(r.path, "결과보고서 HWPX (템플릿)");
       } else {
         log(`HWPX 생성: ${selected} → 단순 변환 (템플릿 미지정)`);
@@ -286,18 +294,28 @@ export default function App() {
       },
       {
         label: isHwpx
-          ? "★ 이 HWPX를 템플릿으로 지정"
+          ? "🎯 이 HWPX를 글쓰기 주입 문서로 지정"
           : isPptx
-          ? "★ 이 PPTX를 템플릿으로 지정"
-          : "템플릿은 HWPX/PPTX만 지정 가능",
+          ? "🎯 이 PPTX를 글쓰기 주입 문서로 지정"
+          : "주입 문서는 HWPX/PPTX만 지정 가능",
         onClick: () => {
           setStyleRef(p);
-          log(`템플릿 지정: ${p}`);
+          log(`글쓰기 주입 문서 지정: ${p}`);
         },
         disabled: !(isHwpx || isPptx),
       },
+      {
+        label: isHwpx
+          ? "📐 이 HWPX를 양식 문서로 지정 (디자인 주입)"
+          : "양식 문서는 HWPX만 지정 가능",
+        onClick: () => {
+          setFormatRef(p);
+          log(`양식 문서 지정: ${p}`);
+        },
+        disabled: !isHwpx,
+      },
     ];
-  }, [menu, multiSelected, selected, styleRef]);
+  }, [menu, multiSelected, selected, styleRef, formatRef]);
 
   return (
     <div className="layout">
@@ -409,11 +427,25 @@ export default function App() {
           active={selected === styleRef}
           onClear={() => {
             setStyleRef(null);
-            log("템플릿 해제됨");
+            log("글쓰기 주입 문서 해제됨");
           }}
           onSelect={() => {
             if (styleRef) {
               setSelected(styleRef);
+              setSelectedExt(".hwpx");
+            }
+          }}
+        />
+        <StyleFormatPanel
+          stylePath={formatRef}
+          active={selected === formatRef}
+          onClear={() => {
+            setFormatRef(null);
+            log("양식 문서 해제됨");
+          }}
+          onSelect={() => {
+            if (formatRef) {
+              setSelected(formatRef);
               setSelectedExt(".hwpx");
             }
           }}

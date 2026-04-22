@@ -125,7 +125,7 @@ export const api = {
     j<{ ok: boolean; models: { id: string; display: string; version: string }[]; error?: string }>(
       `/api/gemini/models?api_key=${encodeURIComponent(api_key)}`
     ),
-  injectFromMd: (body: { template_hwpx: string; md_path: string; output_hwpx: string }) =>
+  injectFromMd: (body: { template_hwpx: string; md_path: string; output_hwpx: string; style_hwpx?: string }) =>
     j<{ path: string; bytes: number; sections_replaced: number; matched_sections: string[]; md_sections_total: number }>(
       `/api/template/inject-from-md`,
       { method: "POST", body: JSON.stringify(body) }
