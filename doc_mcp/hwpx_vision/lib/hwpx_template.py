@@ -231,6 +231,34 @@ def _strip_md_heading_prefix(text: str) -> str:
     return m.group(1).strip() if m else text
 
 
+MARKER_FALLBACK_CHAIN: dict[str, list[str]] = {
+    # 기호별 폴백 우선순위. 양식에 해당 마커 템플릿이 없을 때 이 순서로 시도.
+    "DASH": ["L3_UPPER", "L4_PAREN", "L2_HAN"],
+    "BULLET_CIRCLE": ["L2_HAN", "L3_UPPER"],
+    "BULLET_SHAPE": ["L3_UPPER", "L4_PAREN"],
+    "BULLET_DIAMOND": ["L3_UPPER"],
+    "NOTE": ["L3_UPPER", "L2_HAN"],
+    "L6_ROMAN": ["L5_CIRCLED", "L4_PAREN"],
+    "L5_CIRCLED": ["L4_PAREN", "L3_UPPER"],
+    "L4_PAREN": ["L3_UPPER", "L2_HAN"],
+    "L3_UPPER": ["L2_HAN", "L4_PAREN"],
+    "L2_HAN": ["L1_NUM"],
+    "PLAIN": ["L3_UPPER", "L2_HAN"],
+}
+
+
+def _resolve_template(marker_pool: dict, key: str, fallback_body) -> Optional[etree._Element]:
+    """마커 키로 양식 단락을 찾되, 없으면 MARKER_FALLBACK_CHAIN 순서대로 시도."""
+    src = marker_pool.get(key)
+    if src is not None:
+        return src
+    for fb in MARKER_FALLBACK_CHAIN.get(key, []):
+        src = marker_pool.get(fb)
+        if src is not None:
+            return src
+    return marker_pool.get("PLAIN") or fallback_body
+
+
 def _strip_leading_marker(text: str) -> str:
     """선두 머리 기호와 공백 제거 (템플릿 단락이 이미 기호를 자동 렌더하므로 중복 방지)."""
     s = text.lstrip()
@@ -614,11 +642,7 @@ def render_with_baseline_layout(
             section_elems: list[etree._Element] = [heading_clone]
             for line in body_lines:
                 key = _classify_line_marker(line)
-                src = marker_pool.get(key)
-                if src is None:
-                    src = marker_pool.get("PLAIN")
-                if src is None:
-                    src = fallback_body
+                src = _resolve_template(marker_pool, key, fallback_body)
                 if src is None:
                     continue
                 new_p = etree.fromstring(etree.tostring(src))
