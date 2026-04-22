@@ -173,11 +173,11 @@ CIRCLED_DIGITS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
 
 MD_LEVEL_TO_MARKER = {
     1: "L1_NUM",
-    2: "L1_NUM",
-    3: "L2_HAN",
-    4: "L3_UPPER",
-    5: "L4_PAREN",
-    6: "L5_CIRCLED",
+    2: "L2_HAN",
+    3: "L3_UPPER",
+    4: "L4_PAREN",
+    5: "L5_CIRCLED",
+    6: "L6_ROMAN",
 }
 
 
@@ -647,6 +647,9 @@ def render_with_baseline_layout(
                     continue
                 new_p = etree.fromstring(etree.tostring(src))
                 _strip_layout_cache(new_p)
+                # body 단락도 자동번호 제거 → 양식의 'A.' 등 자동 마커와 MD 의
+                # '○/-/·' 기호가 이중으로 찍히지 않게 함
+                _strip_auto_numbering(new_p)
                 _set_paragraph_text(new_p, _strip_md_heading_prefix(line))
                 section_elems.append(new_p)
 
