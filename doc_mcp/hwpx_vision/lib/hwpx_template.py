@@ -444,25 +444,24 @@ def _clone_block(elements: list[etree._Element]) -> list[etree._Element]:
 
 def _strip_tables_from_block(cloned: list[etree._Element]) -> list[etree._Element]:
     """
-    복제된 블록에서 표(<hp:tbl>) 및 표만 포함한 단락을 제거.
-    양식의 샘플 표가 섹션 수만큼 반복 복제되는 것 방지.
+    복제된 블록에서 표(<hp:tbl>), 표만 포함한 단락, 완전히 빈 단락을 제거.
+    양식의 샘플 표와 빈 줄(공간)이 섹션 수만큼 반복 복제되는 것 방지.
     """
+    PIC_LOCALS = {"pic", "container", "rect", "line", "lineShape", "recShape"}
     result: list[etree._Element] = []
     for elem in cloned:
-        # 1) 요소 자체가 hp:tbl 이면 제거
         if etree.QName(elem).localname == "tbl":
             continue
-        # 2) 요소 내부의 <hp:tbl> 제거 (run 안에 있는 경우)
         for tbl in list(elem.iter()):
             if etree.QName(tbl).localname == "tbl":
                 parent = tbl.getparent()
                 if parent is not None:
                     parent.remove(tbl)
-        # 3) 빈 단락이 된 경우(텍스트 없고 표만 있던 단락)도 제거
         if etree.QName(elem).localname == "p":
             txt = _paragraph_text(elem)
-            has_pic = any(etree.QName(e).localname in ("pic", "container", "rect", "line", "lineShape", "recShape") for e in elem.iter())
-            if not txt and not has_pic:
+            has_visual = any(etree.QName(e).localname in PIC_LOCALS for e in elem.iter())
+            # 텍스트도 없고 그림/도형도 없으면 완전 빈 단락 → 제거
+            if not txt and not has_visual:
                 continue
         result.append(elem)
     return result
