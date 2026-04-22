@@ -157,52 +157,63 @@ async def template_draft_md(body: DraftMdBody):
 
 
 class InjectWithLayoutBody(BaseModel):
-    sample_hwpx: str          # 양식 문서 (베이스라인 레이아웃)
-    injection_hwpx: str       # 주입 문서 (헤딩 구조 소스)
-    md_path: str              # MD 본문
+    sample_hwpx: str                          # 양식 문서 (베이스라인 레이아웃)
+    md_path: str                              # MD 본문
     output_hwpx: str
+    injection_hwpx: str | None = None         # (선택) 주입 문서 — 생략 시 MD 헤딩 사용
 
 
 @router.post("/template/inject-with-layout")
 def template_inject_with_layout(body: InjectWithLayoutBody) -> dict[str, Any]:
     """
-    2-박스 모드 (Plan B):
+    Plan B 모드:
       - 양식 문서 = 베이스라인 레이아웃 (표지/헤더/첫 섹션 블록을 템플릿으로)
-      - 주입 문서 = 헤딩 구조 소스 (이 문서의 헤딩 리스트로 섹션을 N번 복제)
+      - 주입 문서(선택) = 헤딩 리스트 소스. 생략 시 MD 의 헤딩을 순서대로 사용.
       - MD = 본문 텍스트
     """
     if not Path(body.sample_hwpx).exists():
         raise HTTPException(404, "양식 문서 없음")
-    if not Path(body.injection_hwpx).exists():
-        raise HTTPException(404, "주입 문서 없음")
     if not Path(body.md_path).exists():
         raise HTTPException(404, "MD 없음")
 
     md_text = Path(body.md_path).read_text(encoding="utf-8")
     md_sections = parse_md_sections(md_text)
 
-    try:
-        injection_headings = list_headings(body.injection_hwpx)
-    except Exception as e:
-        raise HTTPException(500, f"주입 문서 헤딩 추출 실패: {e}")
-
-    import re as _re
-    toc_tail = _re.compile(r"\s+\d{1,3}\s*$")
-    seen: set[str] = set()
     heading_list: list[str] = []
-    for h in injection_headings:
-        if h["body_paragraphs"] < 3:
-            continue
-        norm = toc_tail.sub("", h["heading"]).strip()
-        if norm in seen:
-            continue
-        seen.add(norm)
-        heading_list.append(norm)
+
+    if body.injection_hwpx:
+        if not Path(body.injection_hwpx).exists():
+            raise HTTPException(404, "주입 문서 없음")
+        try:
+            injection_headings = list_headings(body.injection_hwpx)
+        except Exception as e:
+            raise HTTPException(500, f"주입 문서 헤딩 추출 실패: {e}")
+
+        import re as _re
+        toc_tail = _re.compile(r"\s+\d{1,3}\s*$")
+        seen: set[str] = set()
+        for h in injection_headings:
+            if h["body_paragraphs"] < 3:
+                continue
+            norm = toc_tail.sub("", h["heading"]).strip()
+            if norm in seen:
+                continue
+            seen.add(norm)
+            heading_list.append(norm)
+    else:
+        # MD 자체의 헤딩을 순서대로
+        heading_list = list(md_sections.keys())
 
     if not heading_list:
-        raise HTTPException(400, "주입 문서에서 유효한 헤딩을 찾을 수 없습니다 (body_paragraphs>=3 기준).")
+        raise HTTPException(
+            400,
+            "헤딩 리스트를 만들 수 없음. 주입 문서에 유효 헤딩이 없거나 MD 에 # 헤딩이 없음.",
+        )
 
-    heading_to_body = match_to_template_headings(md_sections, heading_list)
+    if body.injection_hwpx:
+        heading_to_body = match_to_template_headings(md_sections, heading_list)
+    else:
+        heading_to_body = dict(md_sections)
     for h in heading_list:
         heading_to_body.setdefault(h, "")
 
