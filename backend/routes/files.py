@@ -90,3 +90,54 @@ async def upload_md(dest_dir: str = Form(...), file: UploadFile = File(...)) -> 
     target = dest / name
     target.write_bytes(await file.read())
     return {"md_path": str(target)}
+
+
+class MoveBody(BaseModel):
+    source: str        # 이동할 파일/폴더 절대경로
+    target_dir: str    # 옮길 대상 폴더 절대경로
+    workspace_root: str  # 트리 루트 (보안: 이 경로 밖으로 못 나가게)
+
+
+@router.post("/file/move")
+def move_file(body: MoveBody) -> dict[str, Any]:
+    """파일·폴더를 같은 workspace 내 다른 폴더로 이동.
+    보안: source 와 target_dir 모두 workspace_root 안이어야 함. 자기 자신·자손으로 이동 금지.
+    """
+    import shutil
+    try:
+        src = Path(body.source).resolve()
+        tgt = Path(body.target_dir).resolve()
+        root = Path(body.workspace_root).resolve()
+    except Exception as e:
+        raise HTTPException(400, f"경로 해석 실패: {e}")
+
+    if not src.exists():
+        raise HTTPException(404, f"원본 없음: {src}")
+    if not tgt.exists() or not tgt.is_dir():
+        raise HTTPException(400, f"대상 폴더 아님: {tgt}")
+
+    # 보안: 두 경로 모두 root 하위
+    try:
+        src.relative_to(root)
+        tgt.relative_to(root)
+    except ValueError:
+        raise HTTPException(403, "workspace 밖으로 이동 금지")
+
+    # 자기 자신 또는 자손 폴더로 이동 금지
+    if src == tgt or src in tgt.parents or src == tgt.parent:
+        # src == tgt.parent: 같은 폴더 내 이동 (no-op)
+        if src == tgt.parent:
+            return {"ok": True, "noop": True, "new_path": str(src)}
+        raise HTTPException(400, "자기 자신·자손 폴더로 이동할 수 없습니다")
+
+    # 새 경로 = target_dir / source.name
+    new_path = tgt / src.name
+    if new_path.exists():
+        raise HTTPException(409, f"같은 이름의 항목이 이미 있습니다: {new_path.name}")
+
+    try:
+        shutil.move(str(src), str(new_path))
+    except Exception as e:
+        raise HTTPException(500, f"이동 실패: {type(e).__name__}: {e}")
+
+    return {"ok": True, "new_path": str(new_path)}

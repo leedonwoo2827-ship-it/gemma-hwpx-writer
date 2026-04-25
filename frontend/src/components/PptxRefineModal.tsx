@@ -6,6 +6,7 @@ type Props = {
   mdPath: string;
   templatePptx: string;
   outputPptx: string;
+  workDir: string;
   convertResult?: any;
   onClose: () => void;
   onSaved: (suggestedMdPath: string) => void;
@@ -16,6 +17,7 @@ export default function PptxRefineModal({
   mdPath,
   templatePptx,
   outputPptx,
+  workDir,
   convertResult,
   onClose,
   onSaved,
@@ -65,6 +67,7 @@ export default function PptxRefineModal({
         template_pptx: templatePptx,
         output_pptx: outputPptx,
         user_hint: hint.trim() || undefined,
+        output_dir: workDir,
       },
       {
         onStart: (n) => onLog(`  · ${n}건 문제 기반 생성 시작`),

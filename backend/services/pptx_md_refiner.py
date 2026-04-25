@@ -117,15 +117,18 @@ async def refine_md(
         yield chunk
 
 
-def save_suggested_md(md_path: str, suggested_text: str) -> str:
-    """LLM 이 뱉은 MD 를 `{앞3자}_suggested_{ts}.md` 로 같은 폴더에 저장.
-    코드펜스 제거 후 파일 생성, 경로 반환.
+def save_suggested_md(md_path: str, suggested_text: str, output_dir: str | None = None) -> str:
+    """LLM 이 뱉은 MD 를 `{앞3자}_suggested_{ts}.md` 로 저장.
+    output_dir 지정 시 그 폴더에, 없으면 입력과 같은 폴더에. 코드펜스 제거 후.
     """
     import time as _time
     from backend.services.pptx_slide_composer import short_stem
     p = Path(md_path)
     ts = _time.strftime("%y%m%d_%H%M%S")
-    out = p.with_name(f"{short_stem(p.stem)}_suggested_{ts}.md")
+    name = f"{short_stem(p.stem)}_suggested_{ts}.md"
+    out_dir = Path(output_dir) if output_dir else p.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / name
     cleaned = _strip_fences(suggested_text)
     out.write_text(cleaned, encoding="utf-8")
     return str(out)

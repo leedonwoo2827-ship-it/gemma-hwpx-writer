@@ -104,6 +104,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ reference_source, use_cache: true, pages: 3 }),
     }),
+  moveFile: (body: { source: string; target_dir: string; workspace_root: string }) =>
+    j<{ ok: boolean; new_path: string; noop?: boolean }>(`/api/file/move`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   ollamaHealth: () =>
     j<{ ok: boolean; models: string[]; installed_models: string[]; has_gemma_e4b: boolean; has_gemma_e2b: boolean }>(
       `/api/ollama/health`
@@ -140,6 +145,7 @@ export const api = {
     template_pptx: string;
     md_path: string;
     output_pptx?: string;
+    output_dir?: string;
     dry_run?: boolean;
     keep_unused?: boolean;
   }) =>
@@ -174,7 +180,7 @@ export const api = {
 };
 
 export function pptxDraftSlideMdSSE(
-  body: { md_path: string; template_pptx: string; user_hint?: string },
+  body: { md_path: string; template_pptx: string; user_hint?: string; output_dir?: string },
   cb: {
     onStart?: () => void;
     onChunk: (text: string) => void;
@@ -223,7 +229,7 @@ export function pptxDraftSlideMdSSE(
 }
 
 export function pptxRefineMdSSE(
-  body: { md_path: string; template_pptx: string; output_pptx: string; user_hint?: string },
+  body: { md_path: string; template_pptx: string; output_pptx: string; user_hint?: string; output_dir?: string },
   cb: {
     onStart?: (issueCount: number) => void;
     onChunk: (text: string) => void;

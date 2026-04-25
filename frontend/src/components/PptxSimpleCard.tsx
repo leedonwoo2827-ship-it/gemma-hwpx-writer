@@ -5,6 +5,7 @@ import PptxRefineModal from "./PptxRefineModal";
 type Props = {
   mdPath: string | null;
   tplPath: string | null;
+  workDir: string;
   onMdPathChange: (v: string | null) => void;
   onTplPathChange: (v: string | null) => void;
   onLog: (s: string) => void;
@@ -28,6 +29,7 @@ type ConvertResult = {
 export default function PptxSimpleCard({
   mdPath,
   tplPath,
+  workDir,
   onMdPathChange,
   onTplPathChange,
   onLog,
@@ -51,6 +53,7 @@ export default function PptxSimpleCard({
       const r = await api.pptxConvert({
         template_pptx: tplPath,
         md_path: mdPath,
+        output_dir: workDir,
         keep_unused: keepUnused,
         dry_run: dryRun,
       });
@@ -172,6 +175,7 @@ export default function PptxSimpleCard({
           mdPath={mdPath}
           templatePptx={tplPath}
           outputPptx={result.output_path}
+          workDir={workDir}
           convertResult={result}
           onClose={() => setRefineOpen(false)}
           onSaved={(suggestedPath) => {

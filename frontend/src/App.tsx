@@ -238,7 +238,7 @@ export default function App() {
     beginBusy("슬라이드 글쓰기");
     log(`✍ 슬라이드 글쓰기: ${pptxMd.split(/[\\/]/).pop()} → ${pptxTpl.split(/[\\/]/).pop()} 구조 반영`);
     pptxDraftSlideMdSSE(
-      { md_path: pptxMd, template_pptx: pptxTpl },
+      { md_path: pptxMd, template_pptx: pptxTpl, output_dir: workDir },
       {
         onStart: () => log("  · LLM 호출 시작"),
         onChunk: (t) => {
@@ -504,6 +504,23 @@ export default function App() {
           multiSelected={multiSelected}
           onSelect={onSelect}
           onContextMenu={(path, ext, x, y) => setMenu({ path, ext, x, y })}
+          onMove={async (sourcePath, targetDir) => {
+            try {
+              const r = await api.moveFile({
+                source: sourcePath,
+                target_dir: targetDir,
+                workspace_root: workDir,
+              });
+              if (r.noop) return;
+              const name = sourcePath.split(/[\\/]/).pop();
+              log(`📂 이동: ${name} → ${targetDir.split(/[\\/]/).pop()}/`);
+              // 선택 상태가 옮겨진 파일이면 새 경로로 갱신
+              if (selected === sourcePath) setSelected(r.new_path);
+              setRefreshKey((k) => k + 1);
+            } catch (e: any) {
+              log(`✗ 이동 실패: ${e.message || String(e)}`);
+            }
+          }}
         />
         {activeTab === "hwpx" && (
           <>
@@ -541,6 +558,7 @@ export default function App() {
           <PptxSimpleCard
             mdPath={pptxMd}
             tplPath={pptxTpl}
+            workDir={workDir}
             onMdPathChange={setPptxMd}
             onTplPathChange={setPptxTpl}
             onLog={log}

@@ -32,6 +32,7 @@ class ConvertBody(BaseModel):
     template_pptx: str
     md_path: str
     output_pptx: str | None = None
+    output_dir: str | None = None  # 지정 시 결과를 이 폴더에 생성 (예: workspace root)
     dry_run: bool = False
     keep_unused: bool = False
 
@@ -55,7 +56,9 @@ def pptx_convert(body: ConvertBody) -> dict[str, Any]:
     else:
         from backend.services.pptx_slide_composer import short_stem
         ts = _time.strftime("%y%m%d_%H%M%S")
-        out = md.parent / f"{short_stem(md.stem)}_re_{ts}.pptx"
+        out_dir = Path(body.output_dir) if body.output_dir else md.parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / f"{short_stem(md.stem)}_re_{ts}.pptx"
 
     try:
         result = md2pptx_convert(
@@ -128,6 +131,7 @@ class DraftSlideBody(BaseModel):
     md_path: str
     template_pptx: str
     user_hint: str | None = None
+    output_dir: str | None = None
 
 
 @router.post("/draft-slide-md")
@@ -161,7 +165,7 @@ async def pptx_draft_slide_md(body: DraftSlideBody):
                 yield f"data: {safe}\n\n"
 
             drafted = "".join(collected)
-            saved_path = save_slide_md(str(md_p), drafted)
+            saved_path = save_slide_md(str(md_p), drafted, output_dir=body.output_dir)
             yield f"event: done\ndata: {saved_path}\n\n"
         except Exception as e:
             import traceback
@@ -177,6 +181,7 @@ class RefineBody(BaseModel):
     template_pptx: str
     output_pptx: str
     user_hint: str | None = None
+    output_dir: str | None = None
 
 
 @router.post("/refine-md")
@@ -216,7 +221,7 @@ async def pptx_refine_md(body: RefineBody):
                 yield f"data: {safe}\n\n"
 
             suggested = "".join(collected)
-            saved_path = save_suggested_md(str(md_p), suggested)
+            saved_path = save_suggested_md(str(md_p), suggested, output_dir=body.output_dir)
             yield f"event: done\ndata: {saved_path}\n\n"
         except Exception as e:
             import traceback

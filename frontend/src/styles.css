@@ -92,6 +92,12 @@ input, select, textarea {
 .tree-node { padding: 2px 6px; cursor: pointer; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
 .tree-node:hover { background: var(--bg-elev); }
 .tree-node.selected { background: var(--accent); color: #fff; }
+.tree-node.drop-target {
+  background: rgba(86, 156, 214, 0.25);
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}
+.tree-node[draggable="true"]:active { cursor: grabbing; }
 .tree-indent { padding-left: 14px; }
 .tree-node .name { overflow: hidden; text-overflow: ellipsis; }
 
