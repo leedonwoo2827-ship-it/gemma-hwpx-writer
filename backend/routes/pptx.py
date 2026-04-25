@@ -54,8 +54,8 @@ def pptx_convert(body: ConvertBody) -> dict[str, Any]:
         out = Path(body.output_pptx)
     else:
         from backend.services.pptx_slide_composer import short_stem
-        ts = _time.strftime("%Y%m%d_%H%M%S")
-        out = md.parent / f"{short_stem(md.stem)}_result_{ts}.pptx"
+        ts = _time.strftime("%y%m%d_%H%M%S")
+        out = md.parent / f"{short_stem(md.stem)}_re_{ts}.pptx"
 
     try:
         result = md2pptx_convert(

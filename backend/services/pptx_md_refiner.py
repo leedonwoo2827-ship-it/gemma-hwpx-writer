@@ -124,7 +124,7 @@ def save_suggested_md(md_path: str, suggested_text: str) -> str:
     import time as _time
     from backend.services.pptx_slide_composer import short_stem
     p = Path(md_path)
-    ts = _time.strftime("%Y%m%d_%H%M%S")
+    ts = _time.strftime("%y%m%d_%H%M%S")
     out = p.with_name(f"{short_stem(p.stem)}_suggested_{ts}.md")
     cleaned = _strip_fences(suggested_text)
     out.write_text(cleaned, encoding="utf-8")

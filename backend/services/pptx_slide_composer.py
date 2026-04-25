@@ -163,11 +163,11 @@ def short_stem(stem: str, n: int = 3) -> str:
 
 
 def save_slide_md(md_path: str, drafted_text: str) -> str:
-    """LLM 이 뱉은 MD 를 `{앞3자}_slide_{ts}.md` 로 같은 폴더에 저장."""
+    """LLM 이 뱉은 MD 를 `{앞3자}_sl_{ts}.md` 로 같은 폴더에 저장 (ts: yymmdd_HHMMSS)."""
     import time as _time
     p = Path(md_path)
-    ts = _time.strftime("%Y%m%d_%H%M%S")
-    out = p.with_name(f"{short_stem(p.stem)}_slide_{ts}.md")
+    ts = _time.strftime("%y%m%d_%H%M%S")
+    out = p.with_name(f"{short_stem(p.stem)}_sl_{ts}.md")
     cleaned = _strip_fences(drafted_text)
     out.write_text(cleaned, encoding="utf-8")
     return str(out)
