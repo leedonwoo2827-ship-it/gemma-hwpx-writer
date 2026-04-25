@@ -26,6 +26,8 @@ def ollama_health() -> dict[str, Any]:
     return {
         "ok": ok,
         "models": models,
+        "installed_models": models,
+        # 하위 호환 (deprecated, 기존 프론트 코드 참조 보호)
         "has_gemma_e4b": any("gemma3n:e4b" in m or "gemma4:e4b" in m for m in models),
         "has_gemma_e2b": any("gemma3n:e2b" in m or "gemma4:e2b" in m for m in models),
     }
@@ -34,8 +36,8 @@ def ollama_health() -> dict[str, Any]:
 class ConfigBody(BaseModel):
     provider: str = "ollama"
     gemini_api_key: str = ""
-    model_text: str = "gemma3n:e4b"
-    model_vision: str = "gemma3n:e4b"
+    model_text: str = "qwen2.5:3b"
+    model_vision: str = ""
     gemini_text_model: str = "gemini-2.5-flash"
     gemini_vision_model: str = "gemini-2.5-flash"
 

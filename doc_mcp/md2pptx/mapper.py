@@ -129,7 +129,8 @@ def _pick_text_slot(
             if slot.slide_idx in (1, 3) and len(slot.text) < 80:
                 score += 0.2
         elif role == "subtitle":
-            if any(k in slot.text for k in ("20", "Prof", "KOICA", "PMC")):
+            # 제목 슬라이드의 부제 휴리스틱: 연도·직위·기관 키워드 포함 시 가산점
+            if any(k in slot.text for k in ("20", "Prof", "Dr", "기관", "주관")):
                 score += 0.15
             if slot.slide_idx in (1, 13):
                 score += 0.1

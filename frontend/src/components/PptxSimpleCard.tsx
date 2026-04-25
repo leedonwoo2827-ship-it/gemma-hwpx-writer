@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../api";
 import PptxRefineModal from "./PptxRefineModal";
 
 type Props = {
-  selectedMd: string | null;
-  selectedPptx: string | null;
+  mdPath: string | null;
+  tplPath: string | null;
+  onMdPathChange: (v: string | null) => void;
+  onTplPathChange: (v: string | null) => void;
   onLog: (s: string) => void;
   onResult: (path: string, label: string) => void;
   onRefreshTree?: () => void;
@@ -24,23 +26,20 @@ type ConvertResult = {
 };
 
 export default function PptxSimpleCard({
-  selectedMd,
-  selectedPptx,
+  mdPath,
+  tplPath,
+  onMdPathChange,
+  onTplPathChange,
   onLog,
   onResult,
   onRefreshTree,
 }: Props) {
-  const [mdPath, setMdPath] = useState<string | null>(null);
-  const [tplPath, setTplPath] = useState<string | null>(null);
   const [keepUnused, setKeepUnused] = useState(false);
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [refineOpen, setRefineOpen] = useState(false);
-
-  useEffect(() => { if (selectedMd) setMdPath(selectedMd); }, [selectedMd]);
-  useEffect(() => { if (selectedPptx) setTplPath(selectedPptx); }, [selectedPptx]);
 
   async function run() {
     if (!mdPath || !tplPath) return;
@@ -90,7 +89,7 @@ export default function PptxSimpleCard({
           <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, opacity: mdPath ? 1 : 0.5 }}>
             {preview(mdPath) || "탐색기에서 .md 클릭"}
           </span>
-          {mdPath && <button style={{ padding: "0 6px", fontSize: 10 }} onClick={() => setMdPath(null)}>×</button>}
+          {mdPath && <button style={{ padding: "0 6px", fontSize: 10 }} onClick={() => onMdPathChange(null)}>×</button>}
         </div>
       </div>
 
@@ -101,8 +100,12 @@ export default function PptxSimpleCard({
           <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, opacity: tplPath ? 1 : 0.5 }}>
             {preview(tplPath) || "탐색기에서 .pptx 클릭"}
           </span>
-          {tplPath && <button style={{ padding: "0 6px", fontSize: 10 }} onClick={() => setTplPath(null)}>×</button>}
+          {tplPath && <button style={{ padding: "0 6px", fontSize: 10 }} onClick={() => onTplPathChange(null)}>×</button>}
         </div>
+      </div>
+
+      <div style={{ fontSize: 10, color: "var(--fg-dim)", marginBottom: 8, lineHeight: 1.4 }}>
+        💡 MD 가 줄글·긴 표 위주면 상단 <b>✍ 슬라이드 글쓰기</b> 로 먼저 정리 (선택). 이미 슬라이드용이면 바로 🚀 변환.
       </div>
 
       {/* 옵션 */}
@@ -175,7 +178,7 @@ export default function PptxSimpleCard({
             onLog(`✓ 제안 MD 수락: ${suggestedPath}`);
             onResult(suggestedPath, "개선된 MD (리파이너)");
             onRefreshTree?.();
-            setMdPath(suggestedPath);   // 다음 변환 입력으로 자동 세팅
+            onMdPathChange(suggestedPath);   // 다음 변환 입력으로 자동 세팅
           }}
           onLog={onLog}
         />

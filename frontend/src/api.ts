@@ -105,7 +105,7 @@ export const api = {
       body: JSON.stringify({ reference_source, use_cache: true, pages: 3 }),
     }),
   ollamaHealth: () =>
-    j<{ ok: boolean; models: string[]; has_gemma_e4b: boolean; has_gemma_e2b: boolean }>(
+    j<{ ok: boolean; models: string[]; installed_models: string[]; has_gemma_e4b: boolean; has_gemma_e2b: boolean }>(
       `/api/ollama/health`
     ),
   getConfig: () => j<any>(`/api/config`),
@@ -172,6 +172,55 @@ export const api = {
       slides_in_output: number;
     }>(`/api/pptx/analyze`, { method: "POST", body: JSON.stringify(body) }),
 };
+
+export function pptxDraftSlideMdSSE(
+  body: { md_path: string; template_pptx: string; user_hint?: string },
+  cb: {
+    onStart?: () => void;
+    onChunk: (text: string) => void;
+    onDone: (savedMdPath: string) => void;
+    onError: (err: string) => void;
+  }
+): () => void {
+  const ctrl = new AbortController();
+  (async () => {
+    try {
+      const r = await fetch(`/api/pptx/draft-slide-md`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!r.body) throw new Error("no stream");
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() || "";
+        for (const p of parts) {
+          const lines = p.split("\n");
+          let event = "message";
+          let data = "";
+          for (const ln of lines) {
+            if (ln.startsWith("event:")) event = ln.slice(6).trim();
+            else if (ln.startsWith("data:")) data += ln.slice(5).trim();
+          }
+          if (event === "start") cb.onStart?.();
+          else if (event === "done") cb.onDone(data);
+          else if (event === "error") cb.onError(data);
+          else cb.onChunk(data.replace(/\\n/g, "\n"));
+        }
+      }
+    } catch (e: any) {
+      cb.onError(e.message || String(e));
+    }
+  })();
+  return () => ctrl.abort();
+}
 
 export function pptxRefineMdSSE(
   body: { md_path: string; template_pptx: string; output_pptx: string; user_hint?: string },

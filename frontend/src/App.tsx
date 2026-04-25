@@ -9,7 +9,7 @@ import MdList from "./components/MdList";
 import InjectTargetPanel from "./components/InjectMdPanel";
 import StyleFormatPanel from "./components/StyleFormatPanel";
 import PptxSimpleCard from "./components/PptxSimpleCard";
-import { api, composeSSE, draftMdSSE, FileNode } from "./api";
+import { api, composeSSE, draftMdSSE, pptxDraftSlideMdSSE, FileNode } from "./api";
 
 const DEFAULT_ROOT = "_context";
 
@@ -60,6 +60,19 @@ export default function App() {
     return Number.isFinite(v) && v >= 180 ? v : 320;
   });
   const [dragging, setDragging] = useState<"left" | "right" | null>(null);
+
+  // PPTX 탭 전용: MD + 양식 PPTX 선택 (상단 ✍ 버튼이 사용)
+  const [pptxMd, setPptxMd] = useState<string | null>(null);
+  const [pptxTpl, setPptxTpl] = useState<string | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+
+  // PPTX 탭에서 파일 선택 시 확장자에 따라 MD/PPTX 슬롯 자동 세팅
+  useEffect(() => {
+    if (activeTab !== "pptx" || !selected) return;
+    const low = selected.toLowerCase();
+    if (low.endsWith(".md")) setPptxMd(selected);
+    else if (low.endsWith(".pptx")) setPptxTpl(selected);
+  }, [selected, activeTab]);
 
   useEffect(() => {
     if (styleRef) localStorage.setItem("styleRef", styleRef);
@@ -228,6 +241,40 @@ export default function App() {
     }
   };
 
+  const runDraftSlide = () => {
+    if (!pptxMd || !pptxTpl || draftBusy) return;
+    setDraftBusy(true);
+    setStreamBuf("");
+    beginBusy("슬라이드 글쓰기");
+    log(`✍ 슬라이드 글쓰기: ${pptxMd.split(/[\\/]/).pop()} → ${pptxTpl.split(/[\\/]/).pop()} 구조 반영`);
+    pptxDraftSlideMdSSE(
+      { md_path: pptxMd, template_pptx: pptxTpl },
+      {
+        onStart: () => log("  · LLM 호출 시작"),
+        onChunk: (t) => {
+          setStreamBuf((b) => b + t);
+          setChunkCount((c) => c + 1);
+        },
+        onDone: (savedPath) => {
+          setDraftBusy(false);
+          log(`✓ 슬라이드용 MD 저장: ${savedPath}`);
+          addResult(savedPath, "슬라이드용 재구조화 MD");
+          setRefreshKey((k) => k + 1);
+          setPptxMd(savedPath);
+          setSelected(savedPath);
+          setSelectedExt(".md");
+          setStreamBuf("");
+          endBusy();
+        },
+        onError: (msg) => {
+          setDraftBusy(false);
+          log(`✗ 슬라이드 글쓰기 실패: ${msg}`);
+          endBusy();
+        },
+      }
+    );
+  };
+
   const runHwpxFromSelected = async () => {
     if (!selected || !selected.toLowerCase().endsWith(".md")) {
       log("HWPX로 만들 MD를 먼저 선택하세요.");
@@ -385,19 +432,38 @@ export default function App() {
           </span>
         )}
         <div className="spacer" />
-        {/* 📝 MD 합성: HWPX·PPTX 공통 전처리 — 탭 무관 항상 노출 */}
-        <button
-          onClick={compose}
-          disabled={effectiveMdSelection().length < (styleRef ? 1 : 2)}
-          title={
-            styleRef
-              ? "선택된 MD들 + 템플릿 헤딩 구조 → 구조화된 초안 MD (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
-              : "선택된 MD들을 1개 MD로 합성 (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
-          }
-        >
-          📝 MD 합성 ({effectiveMdSelection().length})
-          {styleRef && <span style={{ fontSize: 9, marginLeft: 4, color: "var(--accent)" }}>+템플릿</span>}
-        </button>
+        {/* 📝 MD 합성: HWPX 탭 전용 (여러 MD → 통합 MD, 결과는 PPTX 에서도 재사용 가능) */}
+        {activeTab === "hwpx" && (
+          <button
+            onClick={compose}
+            disabled={effectiveMdSelection().length < (styleRef ? 1 : 2)}
+            title={
+              styleRef
+                ? "선택된 MD들 + 템플릿 헤딩 구조 → 구조화된 초안 MD (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
+                : "선택된 MD들을 1개 MD로 합성 (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
+            }
+          >
+            📝 MD 합성 ({effectiveMdSelection().length})
+            {styleRef && <span style={{ fontSize: 9, marginLeft: 4, color: "var(--accent)" }}>+템플릿</span>}
+          </button>
+        )}
+        {/* ✍ 슬라이드 글쓰기: PPTX 탭 전용 (변환 전 MD 재구조화) */}
+        {activeTab === "pptx" && (
+          <button
+            onClick={runDraftSlide}
+            disabled={!pptxMd || !pptxTpl || draftBusy}
+            title={
+              !pptxMd
+                ? "탐색기에서 .md 를 먼저 선택하세요"
+                : !pptxTpl
+                ? "탐색기에서 양식 .pptx 를 먼저 선택하세요"
+                : "MD 를 양식 PPTX 구조(슬라이드 수·표 행수·본문 용량)에 맞게 사전 재구조화 (LLM). 변환 전 오버플로우 예방."
+            }
+            style={{ background: draftBusy ? "var(--border)" : "#4a7fc5", color: "#fff" }}
+          >
+            {draftBusy ? "⏳ 글쓰기 중..." : "✍ 슬라이드 글쓰기"}
+          </button>
+        )}
         {/* 🎯 HWPX 생성: HWPX 탭에서만 */}
         {activeTab === "hwpx" && (
           <button
@@ -490,8 +556,10 @@ export default function App() {
         )}
         {activeTab === "pptx" && (
           <PptxSimpleCard
-            selectedMd={selected && selected.toLowerCase().endsWith(".md") ? selected : null}
-            selectedPptx={selected && selected.toLowerCase().endsWith(".pptx") ? selected : null}
+            mdPath={pptxMd}
+            tplPath={pptxTpl}
+            onMdPathChange={setPptxMd}
+            onTplPathChange={setPptxTpl}
             onLog={log}
             onResult={(path, label) => addResult(path, label)}
             onRefreshTree={() => setRefreshKey((k) => k + 1)}

@@ -10,8 +10,9 @@ import httpx
 
 
 OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-DEFAULT_VISION_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "gemma3n:e4b")
-DEFAULT_TEXT_MODEL = os.environ.get("OLLAMA_TEXT_MODEL", "gemma3n:e4b")
+# 비전은 기본 빈 값 — Settings 에서 선택 시에만 활성화 (HWPX 비전은 클라우드 Gemini 권장)
+DEFAULT_VISION_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "")
+DEFAULT_TEXT_MODEL = os.environ.get("OLLAMA_TEXT_MODEL", "qwen2.5:3b")
 
 
 def _b64(path: str) -> str:

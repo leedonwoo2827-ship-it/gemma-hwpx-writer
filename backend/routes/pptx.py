@@ -123,6 +123,54 @@ def pptx_analyze(body: AnalyzeBody) -> dict[str, Any]:
     return result
 
 
+class DraftSlideBody(BaseModel):
+    md_path: str
+    template_pptx: str
+    user_hint: str | None = None
+
+
+@router.post("/draft-slide-md")
+async def pptx_draft_slide_md(body: DraftSlideBody):
+    """양식 PPTX 구조 기반으로 MD 를 슬라이드용으로 재구조화.
+    SSE 로 스트리밍 + 마지막에 저장된 새 MD 경로 반환.
+    변환 전 단계 — 오버플로우·클리핑 예방용.
+    """
+    from backend.services.pptx_slide_composer import draft_slide_md, save_slide_md
+
+    md_p = Path(body.md_path)
+    tpl = Path(body.template_pptx)
+    if not md_p.exists():
+        raise HTTPException(404, f"MD 없음: {md_p}")
+    if not tpl.exists():
+        raise HTTPException(404, f"양식 PPTX 없음: {tpl}")
+    if tpl.suffix.lower() != ".pptx":
+        raise HTTPException(400, f"양식 파일이 PPTX 아님: {tpl.name}")
+
+    async def stream():
+        collected: list[str] = []
+        try:
+            yield "event: start\ndata: 0\n\n"
+            async for chunk in draft_slide_md(
+                md_path=str(md_p),
+                template_pptx=str(tpl),
+                user_hint=body.user_hint,
+            ):
+                collected.append(chunk)
+                safe = chunk.replace("\r", "").replace("\n", "\\n")
+                yield f"data: {safe}\n\n"
+
+            drafted = "".join(collected)
+            saved_path = save_slide_md(str(md_p), drafted)
+            yield f"event: done\ndata: {saved_path}\n\n"
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            msg = f"{type(e).__name__}: {e}"
+            yield f"event: error\ndata: {msg}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 class RefineBody(BaseModel):
     md_path: str
     template_pptx: str

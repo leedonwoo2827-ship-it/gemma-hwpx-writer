@@ -17,7 +17,7 @@ CONFIG_PATH = Path(os.environ.get("HWPX_CONFIG", Path.home() / ".config" / "hwpx
 def load_config() -> dict:
     if CONFIG_PATH.exists():
         return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    return {"provider": "ollama", "gemini_api_key": "", "model_text": "gemma3n:e4b", "model_vision": "gemma3n:e4b"}
+    return {"provider": "ollama", "gemini_api_key": "", "model_text": "qwen2.5:3b", "model_vision": ""}
 
 
 def save_config(cfg: dict) -> None:
@@ -38,7 +38,7 @@ class LLMProvider(ABC):
 class OllamaProvider(LLMProvider):
     name = "ollama"
 
-    def __init__(self, base_url: str = "http://localhost:11434", text_model: str = "gemma3n:e4b", vision_model: str = "gemma3n:e4b"):
+    def __init__(self, base_url: str = "http://localhost:11434", text_model: str = "qwen2.5:3b", vision_model: str = ""):
         self.base_url = base_url
         self.text_model = text_model
         self.vision_model = vision_model
@@ -63,6 +63,12 @@ class OllamaProvider(LLMProvider):
                         break
 
     async def generate_vision(self, image_paths: Iterable[str], prompt: str, system: Optional[str] = None) -> str:
+        if not self.vision_model:
+            raise RuntimeError(
+                "로컬 Ollama 비전 모델이 설정되지 않았습니다. "
+                "Settings 에서 Gemini provider 로 전환하거나, "
+                "비전 가능 모델 (예: gemma3:4b, gemma3n:e4b) 을 비전 모델란에 입력하세요."
+            )
         images_b64 = [base64.b64encode(Path(p).read_bytes()).decode("ascii") for p in image_paths]
         payload = {
             "model": self.vision_model,
@@ -192,6 +198,6 @@ def get_provider() -> LLMProvider:
         )
     return OllamaProvider(
         base_url=cfg.get("ollama_base", "http://localhost:11434"),
-        text_model=cfg.get("model_text", "gemma3n:e4b"),
-        vision_model=cfg.get("model_vision", "gemma3n:e4b"),
+        text_model=cfg.get("model_text", "qwen2.5:3b"),
+        vision_model=cfg.get("model_vision", ""),
     )

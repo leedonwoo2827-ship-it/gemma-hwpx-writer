@@ -30,13 +30,7 @@ config.json
 Thumbs.db
 
 # Real project inputs (exclude to protect client data)
-_context/*.hwp
-_context/*.hwpx
-_context/*.pdf
-_context/*.docx
-_context/*.md
-_context/*.pptx
-_context/*.tmp
-_context/pptx_projects/
+# 전체 폴더 차단 — 하위 디렉토리 포함 모두 비추적
+_context/
 .style_cache/
 .tmp_inspect/

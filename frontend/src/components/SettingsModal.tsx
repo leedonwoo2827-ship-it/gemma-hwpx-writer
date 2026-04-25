@@ -6,11 +6,30 @@ type Props = { onClose: () => void; workDir: string; setWorkDir: (s: string) => 
 const DEFAULT_CFG = {
   provider: "ollama",
   gemini_api_key: "",
-  model_text: "gemma4:e4b",
-  model_vision: "gemma4:e4b",
+  model_text: "qwen2.5:3b",
+  model_vision: "",
   gemini_text_model: "gemini-2.5-flash",
   gemini_vision_model: "gemini-2.5-flash",
 };
+
+// 텍스트 모델 프리셋 — 가장 가벼운 게 첫 줄 (해외 배포 권장)
+type ModelPreset = { value: string; label: string; ramHint: "light" | "mid" | "heavy" | null };
+const TEXT_MODEL_PRESETS: ModelPreset[] = [
+  { value: "qwen2.5:3b",  label: "qwen2.5:3b — 가벼움 (RAM 4-8GB, 권장 ★)",  ramHint: "light" },
+  { value: "qwen2.5:7b",  label: "qwen2.5:7b — 표준 (RAM 8-16GB)",            ramHint: "mid"   },
+  { value: "mistral:7b",  label: "mistral:7b — 표준 (영문 중심)",              ramHint: "mid"   },
+  { value: "gemma2:9b",   label: "gemma2:9b — 헤비 (RAM 16GB+)",               ramHint: "heavy" },
+  { value: "gemma3n:e4b", label: "gemma3n:e4b — 헤비 (멀티모달)",              ramHint: "heavy" },
+  { value: "__custom__",  label: "직접 입력...",                                 ramHint: null    },
+];
+
+// 비전 모델 프리셋 — 빈 값 = Gemini 만 사용
+const VISION_MODEL_PRESETS: ModelPreset[] = [
+  { value: "",            label: "(없음 — HWPX 비전은 Gemini 사용)",           ramHint: null    },
+  { value: "gemma3:4b",   label: "gemma3:4b — 가벼운 비전 (RAM 8GB+)",         ramHint: "mid"   },
+  { value: "gemma3n:e4b", label: "gemma3n:e4b — 멀티모달 (RAM 16GB+)",         ramHint: "heavy" },
+  { value: "__custom__",  label: "직접 입력...",                                 ramHint: null    },
+];
 
 // '📋 계정 모델 목록' 으로 실제 사용 가능 모델 확인 권장.
 // 3.x는 이름 규칙이 자주 바뀌므로 여러 후보명 포함.
@@ -95,6 +114,26 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
 
   const modelSuggestions = availableModels.length > 0 ? availableModels : KNOWN_GEMINI_MODELS;
 
+  const installedModels: string[] = health?.installed_models || health?.models || [];
+  const isInstalled = (m: string) => !!m && installedModels.some((x) => x === m || x.startsWith(m + ":"));
+
+  const presetMatches = (presets: ModelPreset[], current: string) =>
+    presets.some((p) => p.value !== "__custom__" && p.value === current);
+
+  const [textCustom, setTextCustom] = useState(false);
+  const [visionCustom, setVisionCustom] = useState(false);
+
+  // cfg 가 로드된 후 현재값이 프리셋에 없으면 자동으로 "직접 입력" 모드로 전환
+  useEffect(() => {
+    if (cfg.model_text !== undefined) {
+      setTextCustom(!presetMatches(TEXT_MODEL_PRESETS, cfg.model_text));
+    }
+    if (cfg.model_vision !== undefined) {
+      setVisionCustom(!presetMatches(VISION_MODEL_PRESETS, cfg.model_vision));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg.model_text, cfg.model_vision]);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -132,33 +171,94 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
                 </button>
               </label>
               <div style={{ fontSize: 11, color: "var(--fg-dim)" }}>
-                설치된 모델: {health?.models?.join(", ") || "없음"}
-                <br />
-                {health?.has_gemma_e4b
-                  ? "✓ e4b 계열 감지됨"
-                  : "✗ e4b 모델 없음 — ollama pull gemma4:e4b"}
+                설치된 모델: {installedModels.join(", ") || "없음"}
               </div>
             </div>
+
+            {/* 텍스트 모델 — 프리셋 드롭다운 + 직접 입력 폴백 */}
             <div className="field">
-              <label>텍스트 모델 (자유 입력)</label>
-              <input
-                list="ollama-models"
-                value={cfg.model_text || ""}
-                onChange={(e) => setCfg({ ...cfg, model_text: e.target.value })}
-                placeholder="gemma4:e4b"
-              />
+              <label>텍스트 모델</label>
+              <select
+                value={textCustom ? "__custom__" : (cfg.model_text || "qwen2.5:3b")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__custom__") {
+                    setTextCustom(true);
+                  } else {
+                    setTextCustom(false);
+                    setCfg({ ...cfg, model_text: v });
+                  }
+                }}
+              >
+                {TEXT_MODEL_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                    {p.value && p.value !== "__custom__"
+                      ? isInstalled(p.value)
+                        ? "  ✓"
+                        : "  ✗ ollama pull " + p.value
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              {textCustom && (
+                <input
+                  list="ollama-models"
+                  value={cfg.model_text || ""}
+                  onChange={(e) => setCfg({ ...cfg, model_text: e.target.value })}
+                  placeholder="모델명 입력 (예: qwen2.5:3b)"
+                  style={{ marginTop: 4 }}
+                />
+              )}
+              {!textCustom && cfg.model_text && !isInstalled(cfg.model_text) && (
+                <div style={{ fontSize: 10, color: "var(--yellow)", marginTop: 2 }}>
+                  ⚠ 미설치. 터미널: <code>ollama pull {cfg.model_text}</code>
+                </div>
+              )}
             </div>
+
+            {/* 비전 모델 — 프리셋 드롭다운 + 직접 입력 폴백 */}
             <div className="field">
-              <label>비전 모델 (자유 입력)</label>
-              <input
-                list="ollama-models"
-                value={cfg.model_vision || ""}
-                onChange={(e) => setCfg({ ...cfg, model_vision: e.target.value })}
-                placeholder="gemma4:e4b"
-              />
+              <label>비전 모델 (HWPX 경로 전용)</label>
+              <select
+                value={visionCustom ? "__custom__" : (cfg.model_vision ?? "")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__custom__") {
+                    setVisionCustom(true);
+                  } else {
+                    setVisionCustom(false);
+                    setCfg({ ...cfg, model_vision: v });
+                  }
+                }}
+              >
+                {VISION_MODEL_PRESETS.map((p) => (
+                  <option key={p.value || "(none)"} value={p.value}>
+                    {p.label}
+                    {p.value && p.value !== "__custom__"
+                      ? isInstalled(p.value)
+                        ? "  ✓"
+                        : "  ✗ ollama pull " + p.value
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              {visionCustom && (
+                <input
+                  list="ollama-models"
+                  value={cfg.model_vision || ""}
+                  onChange={(e) => setCfg({ ...cfg, model_vision: e.target.value })}
+                  placeholder="비전 모델명 입력 (비우면 Gemini 사용)"
+                  style={{ marginTop: 4 }}
+                />
+              )}
+              <div style={{ fontSize: 10, color: "var(--fg-dim)", marginTop: 2 }}>
+                qwen2.5 는 비전 미지원. 비전 필요 시 gemma3:4b 또는 Gemini provider 권장.
+              </div>
             </div>
+
             <datalist id="ollama-models">
-              {(health?.models || []).map((m: string) => (
+              {installedModels.map((m: string) => (
                 <option key={m} value={m} />
               ))}
             </datalist>

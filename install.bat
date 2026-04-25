@@ -49,8 +49,23 @@ if exist doc_mcp\kordoc\package.json (
 )
 
 echo [6/6] Ollama models
-ollama list 2>nul | findstr /i "gemma3n:e4b" >nul && (echo [OK] gemma3n:e4b installed) || (echo [WARN] run: ollama pull gemma3n:e4b)
-ollama list 2>nul | findstr /i "gemma3n:e2b" >nul && (echo [OK] gemma3n:e2b installed) || (echo [INFO] gemma3n:e2b optional)
+ollama list 2>nul | findstr /i "qwen2.5:3b" >nul
+if errorlevel 1 (
+  echo [INFO] Pulling qwen2.5:3b ^(lightweight Korean text model, ~2GB^)...
+  ollama pull qwen2.5:3b
+  if errorlevel 1 (
+    echo [WARN] qwen2.5:3b pull failed. Run manually: ollama pull qwen2.5:3b
+  ) else (
+    echo [OK] qwen2.5:3b ready
+  )
+) else (
+  echo [OK] qwen2.5:3b installed
+)
+echo [INFO] HWPX vision relies on cloud Gemini API key ^(configure in Settings^).
+echo [INFO] Optional heavier models ^(manual pull^):
+echo         ollama pull qwen2.5:7b
+echo         ollama pull gemma3:4b      ^(local vision option^)
+echo         ollama pull gemma3n:e4b    ^(heavy multimodal^)
 
 echo.
 echo [DONE] Now run: start.bat

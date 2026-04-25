@@ -5,7 +5,7 @@ from typing import AsyncIterator
 from .llm import get_provider
 
 
-SECTION_SYSTEM = """당신은 KOICA/ODA 결과보고서 작성 전문가입니다.
+SECTION_SYSTEM = """당신은 한국어 공공/행정 결과보고서 작성 전문가입니다.
 주어진 여러 원문에서 특정 섹션의 본문만 한국어로 작성합니다.
 
 규칙:
