@@ -154,12 +154,20 @@ async def draft_slide_md(
         yield chunk
 
 
+def short_stem(stem: str, n: int = 3) -> str:
+    """파일명 길이 폭주 방지: 입력 stem 의 앞 n 자만 사용. 공백·구분자는 그대로 둠.
+    예: '0.출장일정-오른-진짜_suggested_20260424_112254' → '0.출' (n=3)
+    """
+    s = stem.strip()
+    return s[:n] if len(s) > n else s
+
+
 def save_slide_md(md_path: str, drafted_text: str) -> str:
-    """LLM 이 뱉은 MD 를 `{원본stem}_slide_{ts}.md` 로 같은 폴더에 저장."""
+    """LLM 이 뱉은 MD 를 `{앞3자}_slide_{ts}.md` 로 같은 폴더에 저장."""
     import time as _time
     p = Path(md_path)
     ts = _time.strftime("%Y%m%d_%H%M%S")
-    out = p.with_name(f"{p.stem}_slide_{ts}.md")
+    out = p.with_name(f"{short_stem(p.stem)}_slide_{ts}.md")
     cleaned = _strip_fences(drafted_text)
     out.write_text(cleaned, encoding="utf-8")
     return str(out)

@@ -49,12 +49,13 @@ def pptx_convert(body: ConvertBody) -> dict[str, Any]:
     if md.suffix.lower() != ".md":
         raise HTTPException(400, f"MD 파일이 .md 아님: {md.name}")
 
-    # 출력 경로 결정
+    # 출력 경로 결정 — 파일명은 입력 MD 의 앞 3자만 따고 작업명·timestamp 부착
     if body.output_pptx:
         out = Path(body.output_pptx)
     else:
+        from backend.services.pptx_slide_composer import short_stem
         ts = _time.strftime("%Y%m%d_%H%M%S")
-        out = md.parent / f"{md.stem}_result_{ts}.pptx"
+        out = md.parent / f"{short_stem(md.stem)}_result_{ts}.pptx"
 
     try:
         result = md2pptx_convert(
