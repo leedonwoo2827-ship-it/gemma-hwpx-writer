@@ -38,6 +38,9 @@ export default function App() {
   const [treeErr, setTreeErr] = useState<string | null>(null);
   const [styleRef, setStyleRef] = useState<string | null>(() => localStorage.getItem("styleRef"));
   const [formatRef, setFormatRef] = useState<string | null>(() => localStorage.getItem("formatRef"));
+  // 적용 상태 — 우클릭 지정 직후 fresh=true (적용 대기), 작업 실행 완료 시 false (적용됨, 흐릿)
+  const [styleRefFresh, setStyleRefFresh] = useState(false);
+  const [formatRefFresh, setFormatRefFresh] = useState(false);
   const [activeTab, setActiveTab] = useState<"hwpx" | "pptx">(
     () => (localStorage.getItem("activeTab") as "hwpx" | "pptx") || "hwpx"
   );
@@ -207,6 +210,8 @@ export default function App() {
       setSelectedExt(".md");
       setStreamBuf("");
       endBusy();
+      // 주입 문서가 합성에 사용됐으면 fresh=false (적용 완료 표시)
+      if (hasTemplate) setStyleRefFresh(false);
     };
     const onError = (err: string) => {
       log(`합성 실패: ${err}`);
@@ -301,6 +306,8 @@ export default function App() {
         });
         log(`완료: ${r.path} (${r.bytes} bytes, ${r.sections_generated} 섹션 생성, ${r.headings_filled}/${r.headings_total} 내용 채움)`);
         addResult(r.path, "결과보고서 HWPX (양식 기반)");
+        setFormatRefFresh(false);
+        if (withInjection) setStyleRefFresh(false);
       } else if (styleIsHwpx) {
         // 주입 문서만 지정: 기존 단일 템플릿 주입
         log(`HWPX 생성 (주입 문서만): ${styleRef!.split(/[\\/]/).pop()} ← ${selected.split(/[\\/]/).pop()}`);
@@ -311,6 +318,7 @@ export default function App() {
         });
         log(`완료: ${r.path} (${r.bytes} bytes, ${r.sections_replaced}/${r.md_sections_total} 섹션 매칭)`);
         addResult(r.path, "결과보고서 HWPX (주입)");
+        setStyleRefFresh(false);
       } else {
         log(`HWPX 생성: ${selected} → 단순 변환 (템플릿 미지정)`);
         const r = await api.mdToHwpx({
@@ -362,6 +370,7 @@ export default function App() {
             : "주입 문서는 HWPX만 지정 가능",
           onClick: () => {
             setStyleRef(p);
+            setStyleRefFresh(true);
             log(`글쓰기 주입 문서 지정: ${p}`);
           },
           disabled: !isHwpx,
@@ -372,6 +381,7 @@ export default function App() {
             : "양식 문서는 HWPX만 지정 가능",
           onClick: () => {
             setFormatRef(p);
+            setFormatRefFresh(true);
             log(`양식 문서 지정: ${p}`);
           },
           disabled: !isHwpx,
@@ -527,8 +537,10 @@ export default function App() {
             <InjectTargetPanel
               templateHwpx={styleRef}
               active={selected === styleRef}
+              fresh={styleRefFresh}
               onClear={() => {
                 setStyleRef(null);
+                setStyleRefFresh(false);
                 log("글쓰기 주입 문서 해제됨");
               }}
               onSelect={() => {
@@ -537,12 +549,18 @@ export default function App() {
                   setSelectedExt(".hwpx");
                 }
               }}
+              onReapply={() => {
+                setStyleRefFresh(true);
+                log(`주입 문서 재적용: ${styleRef?.split(/[\\/]/).pop()}`);
+              }}
             />
             <StyleFormatPanel
               stylePath={formatRef}
               active={selected === formatRef}
+              fresh={formatRefFresh}
               onClear={() => {
                 setFormatRef(null);
+                setFormatRefFresh(false);
                 log("양식 문서 해제됨");
               }}
               onSelect={() => {
@@ -550,6 +568,10 @@ export default function App() {
                   setSelected(formatRef);
                   setSelectedExt(".hwpx");
                 }
+              }}
+              onReapply={() => {
+                setFormatRefFresh(true);
+                log(`양식 문서 재적용: ${formatRef?.split(/[\\/]/).pop()}`);
               }}
             />
           </>
