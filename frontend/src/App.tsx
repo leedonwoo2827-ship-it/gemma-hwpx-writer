@@ -416,57 +416,19 @@ export default function App() {
           🎨 PPTX
         </button>
 
-        {/* 작업 흐름 버튼 (좌→우 순서: 합성/글쓰기 → 변환) */}
+        {/* 📝 MD 합성: 탭 옆 좌측 (입력 가공 — HWPX 탭 전용) */}
         {activeTab === "hwpx" && (
-          <>
-            <button
-              onClick={compose}
-              disabled={effectiveMdSelection().length < (styleRef ? 1 : 2)}
-              title={
-                styleRef
-                  ? "선택된 MD들 + 템플릿 헤딩 구조 → 구조화된 초안 MD (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
-                  : "선택된 MD들을 1개 MD로 합성 (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
-              }
-            >
-              ① 📝 MD 합성 ({effectiveMdSelection().length})
-              {styleRef && <span style={{ fontSize: 9, marginLeft: 4, color: "var(--accent)" }}>+템플릿</span>}
-            </button>
-            <button
-              onClick={runHwpxFromSelected}
-              disabled={
-                !selected ||
-                !selected.toLowerCase().endsWith(".md") ||
-                (!!styleRef && !styleRef.toLowerCase().endsWith(".hwpx"))
-              }
-              title={
-                styleRef && styleRef.toLowerCase().endsWith(".hwpx")
-                  ? "현재 선택된 MD + 템플릿 HWPX → 최종 HWPX (LLM 없음)"
-                  : styleRef
-                  ? "템플릿이 HWPX가 아님 — HWPX 템플릿으로 바꾸세요"
-                  : "현재 선택된 MD → 단순 HWPX (템플릿 없이)"
-              }
-            >
-              ② 🎯 HWPX 생성
-              {styleRef && styleRef.toLowerCase().endsWith(".hwpx") && (
-                <span style={{ fontSize: 9, marginLeft: 4, color: "var(--accent)" }}>+템플릿</span>
-              )}
-            </button>
-          </>
-        )}
-        {activeTab === "pptx" && (
           <button
-            onClick={runDraftSlide}
-            disabled={!pptxMd || !pptxTpl || draftBusy}
+            onClick={compose}
+            disabled={effectiveMdSelection().length < (styleRef ? 1 : 2)}
             title={
-              !pptxMd
-                ? "탐색기에서 .md 를 먼저 선택하세요"
-                : !pptxTpl
-                ? "탐색기에서 양식 .pptx 를 먼저 선택하세요"
-                : "MD 를 양식 PPTX 구조(슬라이드 수·표 행수·본문 용량)에 맞게 사전 재구조화 (LLM). 변환 전 오버플로우 예방."
+              styleRef
+                ? "선택된 MD들 + 템플릿 헤딩 구조 → 구조화된 초안 MD (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
+                : "선택된 MD들을 1개 MD로 합성 (LLM). 결과 MD 는 HWPX 생성·PPTX 변환 모두에 사용 가능."
             }
-            style={{ background: draftBusy ? "var(--border)" : "#4a7fc5", color: "#fff" }}
           >
-            {draftBusy ? "⏳ 글쓰기 중..." : "① ✍ 슬라이드 글쓰기"}
+            📝 MD 합성 ({effectiveMdSelection().length})
+            {styleRef && <span style={{ fontSize: 9, marginLeft: 4, color: "var(--accent)" }}>+템플릿</span>}
           </button>
         )}
 
@@ -485,6 +447,45 @@ export default function App() {
           </span>
         )}
         <div className="spacer" />
+        {/* 우측 작업 버튼 — 설정 앞 */}
+        {activeTab === "hwpx" && (
+          <button
+            onClick={runHwpxFromSelected}
+            disabled={
+              !selected ||
+              !selected.toLowerCase().endsWith(".md") ||
+              (!!styleRef && !styleRef.toLowerCase().endsWith(".hwpx"))
+            }
+            title={
+              styleRef && styleRef.toLowerCase().endsWith(".hwpx")
+                ? "현재 선택된 MD + 템플릿 HWPX → 최종 HWPX (LLM 없음)"
+                : styleRef
+                ? "템플릿이 HWPX가 아님 — HWPX 템플릿으로 바꾸세요"
+                : "현재 선택된 MD → 단순 HWPX (템플릿 없이)"
+            }
+          >
+            🎯 HWPX 생성
+            {styleRef && styleRef.toLowerCase().endsWith(".hwpx") && (
+              <span style={{ fontSize: 9, marginLeft: 4, color: "var(--accent)" }}>+템플릿</span>
+            )}
+          </button>
+        )}
+        {activeTab === "pptx" && (
+          <button
+            onClick={runDraftSlide}
+            disabled={!pptxMd || !pptxTpl || draftBusy}
+            title={
+              !pptxMd
+                ? "탐색기에서 .md 를 먼저 선택하세요"
+                : !pptxTpl
+                ? "탐색기에서 양식 .pptx 를 먼저 선택하세요"
+                : "MD 를 양식 PPTX 구조(슬라이드 수·표 행수·본문 용량)에 맞게 사전 재구조화 (LLM). 변환 전 오버플로우 예방."
+            }
+            style={{ background: draftBusy ? "var(--border)" : "#4a7fc5", color: "#fff" }}
+          >
+            {draftBusy ? "⏳ 글쓰기 중..." : "✍ 슬라이드 글쓰기"}
+          </button>
+        )}
         <button onClick={() => setSettingsOpen(true)}>⚙ 설정</button>
       </div>
 
