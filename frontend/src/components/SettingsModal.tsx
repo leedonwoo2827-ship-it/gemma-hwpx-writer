@@ -204,7 +204,7 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
               </div>
             </div>
 
-            {/* 텍스트 모델 — 프리셋 드롭다운 + 직접 입력 폴백 */}
+            {/* 텍스트 모델 — 설치된 것만 노출 (+ 현재 값 + 직접 입력) */}
             <div className="field">
               <label>텍스트 모델</label>
               <select
@@ -219,16 +219,13 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
                   }
                 }}
               >
-                {TEXT_MODEL_PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                    {p.value && p.value !== "__custom__"
-                      ? isInstalled(p.value)
-                        ? "  ✓"
-                        : "  ✗ ollama pull " + p.value
-                      : ""}
-                  </option>
-                ))}
+                {TEXT_MODEL_PRESETS
+                  .filter((p) => p.value === "__custom__" || isInstalled(p.value) || p.value === cfg.model_text)
+                  .map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
               </select>
               {textCustom && (
                 <input
@@ -239,14 +236,9 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
                   style={{ marginTop: 4 }}
                 />
               )}
-              {!textCustom && cfg.model_text && !isInstalled(cfg.model_text) && (
-                <div style={{ fontSize: 10, color: "var(--yellow)", marginTop: 2 }}>
-                  ⚠ 미설치. 터미널: <code>ollama pull {cfg.model_text}</code>
-                </div>
-              )}
             </div>
 
-            {/* 비전 모델 — 프리셋 드롭다운 + 직접 입력 폴백 */}
+            {/* 비전 모델 — 설치된 것만 노출 (+ 현재 값 + 직접 입력) */}
             <div className="field">
               <label>비전 모델 (HWPX 경로 전용)</label>
               <select
@@ -261,16 +253,13 @@ export default function SettingsModal({ onClose, workDir, setWorkDir }: Props) {
                   }
                 }}
               >
-                {VISION_MODEL_PRESETS.map((p) => (
-                  <option key={p.value || "(none)"} value={p.value}>
-                    {p.label}
-                    {p.value && p.value !== "__custom__"
-                      ? isInstalled(p.value)
-                        ? "  ✓"
-                        : "  ✗ ollama pull " + p.value
-                      : ""}
-                  </option>
-                ))}
+                {VISION_MODEL_PRESETS
+                  .filter((p) => p.value === "" || p.value === "__custom__" || isInstalled(p.value) || p.value === cfg.model_vision)
+                  .map((p) => (
+                    <option key={p.value || "(none)"} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
               </select>
               {visionCustom && (
                 <input
