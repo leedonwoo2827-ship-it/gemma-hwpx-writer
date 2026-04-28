@@ -118,16 +118,22 @@ export default function PptxRefineModal({
     <div
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
-        zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center",
+        position: "fixed",
+        top: 36,                                       // 토픽바 아래
+        left: "calc(var(--left-w, 260px) + 4px)",      // 좌측 패널 + 거터 뒤
+        right: "calc(var(--right-w, 320px) + 4px)",    // 우측 패널 + 거터 앞
+        bottom: 24,                                     // 상태바 위
+        background: "rgba(0,0,0,0.55)",
+        zIndex: 1200, display: "flex", alignItems: "stretch", justifyContent: "stretch",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "95vw", height: "92vh", background: "var(--bg)",
+          flex: 1, margin: 8, background: "var(--bg)",
           border: "1px solid var(--border)", borderRadius: 8,
           display: "flex", flexDirection: "column", overflow: "hidden",
+          boxShadow: "0 4px 18px rgba(0,0,0,0.6)",
         }}
       >
         <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
